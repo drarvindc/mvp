@@ -8,15 +8,11 @@ class AdminAuth implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        $role = session('role');
-        $envToken = getenv('MIGRATE_WEB_KEY') ?: '';
-        $key = $request->getGet('key');
-        if ($role === 'admin') return;
-        if ($envToken && $key === $envToken) return;
-        return redirect()->to('/')->with('error','Unauthorized');
+        $key = $request->getGet('key') ?? '';
+        $validKey = getenv('MIGRATE_WEB_KEY');
+        if (!$validKey || $key !== $validKey) {
+            return redirect()->to('/'); // unauthorized → home
+        }
     }
-    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
-    {
-        // no-op
-    }
+    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null) {}
 }
