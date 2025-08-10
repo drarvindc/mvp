@@ -10,9 +10,7 @@
 <body class="hold-transition layout-top-nav">
 <div class="container mt-5" style="max-width:880px">
   <div class="card card-outline card-primary">
-    <div class="card-header">
-      <h3 class="card-title">Database Migrations</h3>
-    </div>
+    <div class="card-header"><h3 class="card-title">Database Migrations</h3></div>
     <div class="card-body">
       <?php if(session()->getFlashdata('message')): ?>
         <div class="alert alert-success"><?= esc(session()->getFlashdata('message')) ?></div>
@@ -37,7 +35,7 @@
       </form>
 
       <hr>
-      <p class="text-muted">This page is protected by the <code>adminauth</code> filter. Ensure <code>MIGRATE_WEB_KEY</code> is set in <code>.env</code> and appended as <code>?key=YOUR_SECRET</code> in the URL.</p>
+      <p class="text-muted">Protected by <code>adminauth</code>. Ensure <code>MIGRATE_WEB_KEY</code> is set in <code>.env</code> and you append <code>?key=YOUR_SECRET</code> to the URL.</p>
     </div>
   </div>
 </div>

@@ -8,23 +8,17 @@ class AdminAuth implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        // Accept either an admin session OR the MIGRATE_WEB_KEY query/header for headless environments
-        $sessionRole = session('role');
-        $envToken    = getenv('MIGRATE_WEB_KEY') ?: '';
-        $queryToken  = $request->getGet('key');
-        $headerToken = $request->getHeaderLine('X-Migrate-Key');
+        $key   = trim((string)$request->getGet('key'));
+        $valid = getenv('MIGRATE_WEB_KEY'); 
+        $valid = $valid !== false ? trim((string)$valid) : '';
 
-        if ($sessionRole === 'admin') {
-            return;
+        if ($key !== '' && $valid !== '' && hash_equals($valid, $key)) {
+            return; // allowed
         }
-        if ($envToken && ($queryToken === $envToken || $headerToken === $envToken)) {
-            return;
-        }
-        return redirect()->to('/'); // block if not authorized
+        // If you also support admin sessions, you can allow: if (session('role') === 'admin') return;
+
+        return redirect()->to('/'); // unauthorized → home
     }
 
-    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
-    {
-        // no-op
-    }
+    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null) {}
 }

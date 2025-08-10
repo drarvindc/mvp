@@ -6,7 +6,8 @@ class MigrateController extends BaseController
 {
     public function index()
     {
-        return view('admin/migrate/run', []);
+        // No auth logic here; route filter handles it
+        return view('admin/migrate/run');
     }
 
     public function run()
