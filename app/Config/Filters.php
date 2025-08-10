@@ -9,6 +9,7 @@ class Filters extends BaseConfig
         'toolbar'  => \CodeIgniter\Filters\DebugToolbar::class,
         'honeypot' => \CodeIgniter\Filters\Honeypot::class,
         'adminauth'=> \App\Filters\AdminAuth::class,
+		'apiauth' => \App\Filters\ApiAuthFilter::class,
     ];
 
     public $globals = [
@@ -23,9 +24,4 @@ class Filters extends BaseConfig
     public $methods = [];
     public $filters = [];
 }
-
-public $aliases = [
-    // ...
-    'apiauth' => \App\Filters\ApiAuthFilter::class,
-];
 
