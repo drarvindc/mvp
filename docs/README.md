@@ -1,22 +1,27 @@
-# DB Status Panel
+# CI4 Admin Patch (DB Status + AdminAuth)
 
-## Installation
-1. Copy `app/Controllers/Admin/DbStatusController.php` to your project.
-2. Copy `app/Views/admin/dbstatus/index.php` to your project.
-3. In `app/Config/Routes.php`, add:
-```php
-$routes->get('admin/tools/db-status', 'Admin\DbStatusController::index', ['filter' => 'adminauth']);
-```
-4. Protect with `adminauth` filter or your own admin login.
+This patch adds:
+- A tolerant DB Status page (works even before the first migration)
+- AdminAuth filter (protects routes with admin session or ?key=... token)
 
-## Usage
-Visit:
-```
-https://yourdomain/admin/tools/db-status?key=YOUR_TOKEN
-```
-to see:
-- Current time (server TZ Asia/Kolkata)
-- Last applied migration batch number
-- Total applied migrations
-- List of pending migration files
+## Files
+- app/Controllers/Admin/DbStatusController.php
+- app/Views/admin/dbstatus/index.php
+- app/Filters/AdminAuth.php
 
+## Install
+1) Upload and extract this zip in your CI4 project root (merge into `app/`).
+2) Ensure route exists in `app/Config/Routes.php`:
+   $routes->group('admin/tools', ['filter' => 'adminauth'], static function($routes){
+       $routes->get('db-status', 'Admin\DbStatusController::index');
+   });
+3) Ensure filter alias in `app/Config/Filters.php`:
+   public $aliases = [
+     'adminauth' => \App\Filters\AdminAuth::class,
+     // existing aliases...
+   ];
+4) In `.env`, set:
+   MIGRATE_WEB_KEY=your-long-random-secret
+   app.baseURL='https://yourdomain/'
+5) Visit:
+   https://yourdomain/admin/tools/db-status?key=your-long-random-secret

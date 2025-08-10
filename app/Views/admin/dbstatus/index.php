@@ -13,6 +13,9 @@
       <h3 class="card-title">Database Status</h3>
     </div>
     <div class="card-body">
+      <?php if (!($hasTable ?? false)): ?>
+        <div class="alert alert-info">Migrations table not found yet — run migrations once to create it.</div>
+      <?php endif; ?>
       <p><strong>Current Time:</strong> <?= esc($now) ?></p>
       <p><strong>Last Batch Number:</strong> <?= esc($lastBatch) ?></p>
       <p><strong>Total Applied Migrations:</strong> <?= esc($appliedCount) ?></p>
