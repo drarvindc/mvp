@@ -25,7 +25,6 @@ class PatientController extends BaseController
             return redirect()->back()->with('error','Please enter a mobile number or Unique ID.');
         }
         $isUid = preg_match('/^\d{6}$/', $q) === 1;
-        $matches = [];
 
         if ($isUid) {
             $pet = $this->db->table('pets p')
@@ -34,49 +33,49 @@ class PatientController extends BaseController
                 ->join('species s','s.id = p.species_id','left')
                 ->join('breeds b','b.id = p.breed_id','left')
                 ->where('p.unique_id', $q)->get()->getRowArray();
+
+            $results = [];
             if ($pet) {
                 $ownerId = (int)$pet['owner_id'];
-                $others = $this->db->table('pets p')
+                $results = $this->db->table('pets p')
                     ->select('p.id as pet_id, p.unique_id, p.pet_name, p.gender, p.status, p.owner_id, p.species_id, p.breed_id, s.name as species, b.name as breed')
                     ->join('species s','s.id = p.species_id','left')
                     ->join('breeds b','b.id = p.breed_id','left')
                     ->where('p.owner_id', $ownerId)->get()->getResultArray();
-                $matches = $others;
             }
+
             return view('patient/review', [
                 'query'   => $q,
                 'mode'    => 'uid',
                 'petHit'  => $pet,
-                'results' => $matches
-            ]);
-        } else {
-            $digits = preg_replace('/\D+/', '', $q);
-            if ($digits === '') {
-                return redirect()->back()->with('error','Invalid mobile format.');
-            }
-            $ownerRows = $this->db->table('owner_mobiles')
-                ->select('owner_id')->like('mobile_e164', $digits)->get()->getResultArray();
-            $ownerIds = [];
-            foreach ($ownerRows as $r) { $ownerIds[] = (int)$r['owner_id']; }
-            $ownerIds = array_values(array_unique($ownerIds));
-
-            $results = [];
-            if (!empty($ownerIds)) {
-                $results = $this->db->table('pets p')
-                    ->select('p.id as pet_id, p.unique_id, p.pet_name, p.gender, p.status, p.owner_id, p.species_id, p.breed_id, o.first_name, o.last_name, s.name as species, b.name as breed')
-                    ->join('owners o','o.id = p.owner_id','left')
-                    ->join('species s','s.id = p.species_id','left')
-                    ->join('breeds b','b.id = p.breed_id','left')
-                    ->whereIn('p.owner_id', $ownerIds)->get()->getResultArray();
-            }
-            return view('patient/review', [
-                'query'   => $q,
-                'mode'    => 'mobile',
-                'petHit'  => null,
-                'results' => $results,
-                'digits'  => $digits
+                'results' => $results
             ]);
         }
+
+        // MOBILE MODE (assumes storage without country code)
+        $digits = preg_replace('/\D+/', '', $q);
+        if ($digits === '') {
+            return redirect()->back()->with('error','Invalid mobile format.');
+        }
+        $last10 = substr($digits, -10);
+
+        $results = $this->db->table('pets p')
+            ->select('p.id as pet_id, p.unique_id, p.pet_name, p.gender, p.status, p.owner_id, p.species_id, p.breed_id, o.first_name, o.last_name, s.name as species, b.name as breed')
+            ->join('owners o','o.id = p.owner_id','left')
+            ->join('owner_mobiles m','m.owner_id = o.id','left')
+            ->join('species s','s.id = p.species_id','left')
+            ->join('breeds b','b.id = p.breed_id','left')
+            ->where('m.mobile_e164', $last10)
+            ->groupBy('p.id')
+            ->get()->getResultArray();
+
+        return view('patient/review', [
+            'query'   => $q,
+            'mode'    => 'mobile',
+            'petHit'  => null,
+            'results' => $results,
+            'digits'  => $last10
+        ]);
     }
 
     public function printExisting()
@@ -128,8 +127,7 @@ class PatientController extends BaseController
         $seq = (int)$counterRow['last_seq'];
         $uid = $yearTwo . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
 
-        // Link to existing owner by mobile if present; else create provisional owner
-        $exist = $this->db->table('owner_mobiles')->select('owner_id')->like('mobile_e164', $digits)->get()->getRowArray();
+        $exist = $this->db->table('owner_mobiles')->select('owner_id')->where('mobile_e164', substr($digits,-10))->get()->getRowArray();
         if ($exist) {
             $ownerId = (int)$exist['owner_id'];
         } else {
@@ -148,7 +146,7 @@ class PatientController extends BaseController
 
             $this->db->table('owner_mobiles')->insert([
                 'owner_id'   => $ownerId,
-                'mobile_e164'=> $digits,
+                'mobile_e164'=> substr($digits,-10),
                 'is_primary' => 1,
                 'is_verified'=> 0,
                 'created_at' => Time::now('Asia/Kolkata')->toDateTimeString(),
@@ -180,7 +178,7 @@ class PatientController extends BaseController
 
         return view('patient/print_provisional', [
             'uid'    => $uid,
-            'mobile' => $digits,
+            'mobile' => substr($digits,-10),
             'pet'    => null
         ]);
     }

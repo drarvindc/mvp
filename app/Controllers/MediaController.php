@@ -44,4 +44,9 @@ class MediaController extends BaseController
 
         return $this->response->setContentType('image/png')->setBody($result->getString());
     }
+
+    public function ping()
+    {
+        return 'media ok';
+    }
 }
