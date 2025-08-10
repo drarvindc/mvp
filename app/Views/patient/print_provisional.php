@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Provisional Letterhead</title>
+  <title>Clinic Letterhead</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
   <style>
     @media print { .no-print { display:none; } }
@@ -14,8 +14,11 @@
 <div class="letter">
   <h3>Clinic Letterhead</h3>
   <p>Date: <?= date('Y-m-d') ?></p>
-  <p>Unique ID: <?= esc($uid ?? 'TBD') ?></p>
-  <p>Mobile: <?= esc($mobile ?? 'TBD') ?></p>
+  <p>Unique ID: <strong><?= esc($uid ?? 'TBD') ?></strong></p>
+  <?php if(!empty($pet)): ?>
+    <p>Pet: <?= esc($pet['pet_name'] ?? '') ?> (Owner: <?= esc(($pet['first_name'] ?? '') . ' ' . ($pet['last_name'] ?? '')) ?>)</p>
+  <?php endif; ?>
+  <?php if(!empty($mobile)): ?><p>Mobile: <?= esc($mobile) ?></p><?php endif; ?>
   <hr>
   <p>Pet Name: _____________________________</p>
   <p>Owner Name: ___________________________</p>
