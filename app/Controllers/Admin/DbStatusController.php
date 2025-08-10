@@ -9,7 +9,6 @@ class DbStatusController extends BaseController
     {
         $db = \Config\Database::connect();
 
-        // Safe: handle case when migrations table does not exist yet
         $tables = $db->listTables();
         $hasMigrationsTable = in_array('migrations', $tables, true);
 
@@ -21,7 +20,6 @@ class DbStatusController extends BaseController
             $applied = $db->table('migrations')->countAllResults();
         }
 
-        // Pending files listing does not require the table
         $migrations = \Config\Services::migrations();
         $pendingFiles = array_keys($migrations->findMigrations());
 

@@ -1,1 +1,0 @@
-ALTER TABLE pets ADD INDEX idx_microchip (microchip);

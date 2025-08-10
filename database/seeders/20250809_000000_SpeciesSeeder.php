@@ -1,2 +1,0 @@
-<?php
-// Seeder for species

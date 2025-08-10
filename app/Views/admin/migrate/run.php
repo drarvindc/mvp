@@ -19,23 +19,28 @@
         <div class="alert alert-danger"><?= esc(session()->getFlashdata('error')) ?></div>
       <?php endif; ?>
 
-      <form method="post" action="<?= site_url('admin/tools/migrate/run') ?>" class="mb-2">
+      <?php $key = service('request')->getGet('key'); ?>
+
+      <form method="post" action="<?= site_url('admin/tools/migrate/run') . '?key=' . urlencode($key) ?>" class="mb-2">
         <?= csrf_field() ?>
+        <input type="hidden" name="key" value="<?= esc($key) ?>">
         <button type="submit" class="btn btn-primary"><i class="fas fa-play"></i> Run Migrations</button>
       </form>
 
-      <form method="post" action="<?= site_url('admin/tools/migrate/rollback') ?>" class="mb-2">
+      <form method="post" action="<?= site_url('admin/tools/migrate/rollback') . '?key=' . urlencode($key) ?>" class="mb-2">
         <?= csrf_field() ?>
+        <input type="hidden" name="key" value="<?= esc($key) ?>">
         <button type="submit" class="btn btn-warning"><i class="fas fa-undo"></i> Rollback Last Batch</button>
       </form>
 
-      <form method="post" action="<?= site_url('admin/tools/migrate/seed-species') ?>">
+      <form method="post" action="<?= site_url('admin/tools/migrate/seed-species') . '?key=' . urlencode($key) ?>">
         <?= csrf_field() ?>
+        <input type="hidden" name="key" value="<?= esc($key) ?>">
         <button type="submit" class="btn btn-success"><i class="fas fa-seedling"></i> Seed Species & Breeds</button>
       </form>
 
       <hr>
-      <p class="text-muted">Protected by <code>adminauth</code>. Ensure <code>MIGRATE_WEB_KEY</code> is set in <code>.env</code> and you append <code>?key=YOUR_SECRET</code> to the URL.</p>
+      <p class="text-muted">Protected by <code>adminauth</code>. Append <code>?key=YOUR_SECRET</code> to the URL.</p>
     </div>
   </div>
 </div>

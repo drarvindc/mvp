@@ -8,16 +8,18 @@ class AdminAuth implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        $key   = trim((string)$request->getGet('key'));
-        $valid = getenv('MIGRATE_WEB_KEY'); 
+        $valid = getenv('MIGRATE_WEB_KEY');
         $valid = $valid !== false ? trim((string)$valid) : '';
 
-        if ($key !== '' && $valid !== '' && hash_equals($valid, $key)) {
-            return; // allowed
-        }
-        // If you also support admin sessions, you can allow: if (session('role') === 'admin') return;
+        $key = trim((string)($request->getGet('key') ?? ''));
+        if ($key === '') $key = trim((string)($request->getPost('key') ?? ''));
+        if ($key === '') $key = trim((string)$request->getHeaderLine('X-Migrate-Key'));
 
-        return redirect()->to('/'); // unauthorized → home
+        if ($valid !== '' && $key !== '' && hash_equals($valid, $key)) {
+            return;
+        }
+
+        return redirect()->to('/');
     }
 
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null) {}
