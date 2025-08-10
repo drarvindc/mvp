@@ -16,71 +16,91 @@ class VisitController extends BaseController
     }
 
     private function ok($data){ return $this->response->setJSON($data); }
-    private function bad($code, $msg){ return $this->response->setStatusCode($code)->setJSON(['ok'=>false,'error'=>$msg]); }
+    private function bad(int $code, string $msg){ return $this->response->setStatusCode($code)->setJSON(['ok'=>false,'error'=>$msg]); }
 
-    /** Figure out how visits table stores the patient reference. */
+    /** Determine which column the visits table uses to reference the patient. */
     private function visitKeyMode(): string
     {
-        // returns: 'uid' | 'unique_id' | 'pet_id'
-        $fields = array_map('strtolower', $this->db->getFieldNames('visits'));
+        $fields = [];
+        try { $fields = array_map('strtolower', $this->db->getFieldNames('visits')); } catch (\Throwable $e) {}
         if (in_array('unique_id', $fields, true)) return 'unique_id';
-        if (in_array('uid', $fields, true))       return 'uid';
-        if (in_array('pet_id', $fields, true))    return 'pet_id';
-        // fallback to uid
-        return 'uid';
+        if (in_array('uid',       $fields, true)) return 'uid';
+        if (in_array('pet_id',    $fields, true)) return 'pet_id';
+        // safest fallback
+        return 'unique_id';
     }
 
-    /** Get (or create) today's visit for a UID; respects schema differences. */
+    /** Whether visits table has a 'sequence' column (multi-visit/day). */
+    private function hasSequence(): bool
+    {
+        try { return in_array('sequence', array_map('strtolower', $this->db->getFieldNames('visits')), true); }
+        catch (\Throwable $e) { return false; }
+    }
+
+    /** Whether visits table has 'created_at' column (ordering fallback). */
+    private function hasCreatedAt(): bool
+    {
+        try { return in_array('created_at', array_map('strtolower', $this->db->getFieldNames('visits')), true); }
+        catch (\Throwable $e) { return false; }
+    }
+
+    /** Get (or create) today's visit for a UID, handling different schemas. */
     private function ensureTodayVisit(string $uid, bool $forceNew = false): array
     {
-        $today = date('Y-m-d');
-        $mode  = $this->visitKeyMode();
+        $today  = date('Y-m-d');
+        $mode   = $this->visitKeyMode();
+        $hasSeq = $this->hasSequence();
+        $hasCA  = $this->hasCreatedAt();
 
-        // find existing
+        // Try existing (unless forcing a new visit)
         if (!$forceNew) {
             if ($mode === 'pet_id') {
                 $petId = $this->db->table('pets')->select('id')->where('unique_id',$uid)->get()->getRow('id');
                 if ($petId) {
-                    $row = $this->db->table('visits')
-                        ->where(['pet_id'=>$petId,'visit_date'=>$today])
-                        ->orderBy('sequence','DESC')->get()->getRowArray();
-                    if ($row) return [$row,false];
+                    $q = $this->db->table('visits')->where(['pet_id'=>$petId,'visit_date'=>$today]);
+                    if ($hasSeq)      $q = $q->orderBy('sequence','DESC');
+                    elseif ($hasCA)   $q = $q->orderBy('created_at','DESC');
+                    else              $q = $q->orderBy('id','DESC');
+                    $row = $q->get()->getRowArray();
+                    if ($row) return [$row, false];
                 }
             } else {
-                $row = $this->db->table('visits')
-                    ->where([$mode=>$uid,'visit_date'=>$today])
-                    ->orderBy('sequence','DESC')->get()->getRowArray();
-                if ($row) return [$row,false];
+                $q = $this->db->table('visits')->where([$mode=>$uid,'visit_date'=>$today]);
+                if     ($hasSeq) $q = $q->orderBy('sequence','DESC');
+                elseif ($hasCA)  $q = $q->orderBy('created_at','DESC');
+                else             $q = $q->orderBy('id','DESC');
+                $row = $q->get()->getRowArray();
+                if ($row) return [$row, false];
             }
         }
 
-        // compute sequence
+        // Build insert payload
+        $insert = [
+            'visit_date' => $today,
+        ];
+        if ($this->hasCreatedAt()) {
+            $insert['created_at'] = Time::now($this->tz)->toDateTimeString();
+        }
         if ($mode === 'pet_id') {
-            $petId = $this->db->table('pets')->select('id')->where('unique_id',$uid)->get()->getRow('id');
-            $maxSeq = (int)($this->db->table('visits')->selectMax('sequence','s')
-                ->where(['pet_id'=>$petId,'visit_date'=>$today])->get()->getRow('s') ?? 0);
-            $seq = $maxSeq + 1;
-            $this->db->table('visits')->insert([
-                'pet_id'    => $petId,
-                'visit_date'=> $today,
-                'sequence'  => $seq,
-                'created_at'=> Time::now($this->tz)->toDateTimeString(),
-            ]);
+            $insert['pet_id'] = $this->db->table('pets')->select('id')->where('unique_id',$uid)->get()->getRow('id');
         } else {
-            $maxSeq = (int)($this->db->table('visits')->selectMax('sequence','s')
-                ->where([$mode=>$uid,'visit_date'=>$today])->get()->getRow('s') ?? 0);
-            $seq = $maxSeq + 1;
-            $this->db->table('visits')->insert([
-                $mode       => $uid,
-                'visit_date'=> $today,
-                'sequence'  => $seq,
-                'created_at'=> Time::now($this->tz)->toDateTimeString(),
-            ]);
+            $insert[$mode] = $uid;
         }
 
+        // Compute sequence if supported
+        if ($hasSeq) {
+            if ($mode === 'pet_id') {
+                $maxSeq = (int)($this->db->table('visits')->selectMax('sequence','s')->where(['pet_id'=>$insert['pet_id'],'visit_date'=>$today])->get()->getRow('s') ?? 0);
+            } else {
+                $maxSeq = (int)($this->db->table('visits')->selectMax('sequence','s')->where([$mode=>$uid,'visit_date'=>$today])->get()->getRow('s') ?? 0);
+            }
+            $insert['sequence'] = $maxSeq + 1;
+        }
+
+        $this->db->table('visits')->insert($insert);
         $id  = $this->db->insertID();
         $row = $this->db->table('visits')->where('id',$id)->get()->getRowArray();
-        return [$row,true];
+        return [$row, true];
     }
 
     private function getPetOwnerBasics(string $uid): array
@@ -110,13 +130,17 @@ class VisitController extends BaseController
         ];
     }
 
-    // POST /api/visit/open  JSON: { "uid": "250001" }
+    /**
+     * POST /api/visit/open
+     * JSON: { "uid": "250001" }
+     */
     public function open()
     {
         $json = $this->request->getJSON(true);
         $uid  = trim($json['uid'] ?? '');
         if (!preg_match('/^\d{6}$/',$uid)) return $this->bad(400,'uid_required');
 
+        // Ensure pet exists
         $exists = $this->db->table('pets')->select('unique_id')->where('unique_id',$uid)->get()->getRowArray();
         if (!$exists) return $this->bad(404,'uid_not_found');
 
@@ -126,19 +150,21 @@ class VisitController extends BaseController
         return $this->ok([
             'ok'=>true,
             'visit'=>[
-                'id'=>$visit['id'],
-                'date'=>$visit['visit_date'],
-                'sequence'=>$visit['sequence'],
-                // echo the uid for convenience regardless of column used
-                'unique_id'=>$uid,
+                'id'       => $visit['id'],
+                'date'     => $visit['visit_date'],
+                'sequence' => $visit['sequence'] ?? 1,
+                'unique_id'=> $uid,
                 'wasCreated'=>$created,
             ],
-            'pet'=>$basics['pet'] ?? null,
-            'owner'=>$basics['owner'] ?? null,
+            'pet'  => $basics['pet']   ?? null,
+            'owner'=> $basics['owner'] ?? null,
         ]);
     }
 
-    // POST /api/visit/upload  multipart: uid, type, file, note?, forceNewVisit?
+    /**
+     * POST /api/visit/upload
+     * multipart: uid, type, file, note?, forceNewVisit?
+     */
     public function upload()
     {
         $uid   = trim((string)$this->request->getPost('uid'));
@@ -163,7 +189,7 @@ class VisitController extends BaseController
 
         [$visit, $created] = $this->ensureTodayVisit($uid, $force);
 
-        // /storage/patients/{YYYY}/{UID}/
+        // storage path: /storage/patients/{YYYY}/{UID}/
         $y    = date('Y');
         $dmy  = date('dmy');
         $base = rtrim(ROOTPATH, '/')."/storage/patients/{$y}/{$uid}";
@@ -182,14 +208,15 @@ class VisitController extends BaseController
             return $this->bad(500,'upload_failed');
         }
 
+        // DB row
         $this->db->table('attachments')->insert([
-            'visit_id'  => $visit['id'],
-            'type'      => $type,
-            'filename'  => $candidate,
-            'filesize'  => @filesize($path) ?: null,
-            'mime'      => $file->getMimeType(),
-            'note'      => $note ?: null,
-            'created_at'=> Time::now($this->tz)->toDateTimeString(),
+            'visit_id'   => $visit['id'],
+            'type'       => $type,
+            'filename'   => $candidate,
+            'filesize'   => @filesize($path) ?: null,
+            'mime'       => $file->getMimeType(),
+            'note'       => $note ?: null,
+            'created_at' => Time::now($this->tz)->toDateTimeString(),
         ]);
         $attId = $this->db->insertID();
 
@@ -206,36 +233,47 @@ class VisitController extends BaseController
         ]);
     }
 
-    // GET /api/visit/today?uid=250001
+    /**
+     * GET /api/visit/today?uid=250001
+     */
     public function today()
     {
         $uid = trim((string)$this->request->getGet('uid'));
         if (!preg_match('/^\d{6}$/',$uid)) return $this->bad(400,'uid_required');
 
-        $today = date('Y-m-d');
-        $mode  = $this->visitKeyMode();
+        $today  = date('Y-m-d');
+        $mode   = $this->visitKeyMode();
+        $hasSeq = $this->hasSequence();
+        $hasCA  = $this->hasCreatedAt();
 
         if ($mode === 'pet_id') {
             $petId = $this->db->table('pets')->select('id')->where('unique_id',$uid)->get()->getRow('id');
-            $visit = $this->db->table('visits')
-                ->where(['pet_id'=>$petId,'visit_date'=>$today])
-                ->orderBy('sequence','DESC')->get()->getRowArray();
+            $q = $this->db->table('visits')->where(['pet_id'=>$petId,'visit_date'=>$today]);
         } else {
-            $visit = $this->db->table('visits')
-                ->where([$mode=>$uid,'visit_date'=>$today])
-                ->orderBy('sequence','DESC')->get()->getRowArray();
+            $q = $this->db->table('visits')->where([$mode=>$uid,'visit_date'=>$today]);
         }
+        if     ($hasSeq) $q = $q->orderBy('sequence','DESC');
+        elseif ($hasCA)  $q = $q->orderBy('created_at','DESC');
+        else             $q = $q->orderBy('id','DESC');
+
+        $visit = $q->get()->getRowArray();
         if (!$visit) return $this->ok(['ok'=>true,'visit'=>null,'attachments'=>[]]);
 
         $atts = $this->db->table('attachments')->where('visit_id',$visit['id'])->orderBy('id','ASC')->get()->getResultArray();
         return $this->ok([
             'ok'=>true,
-            'visit'=>['id'=>$visit['id'],'date'=>$visit['visit_date'],'sequence'=>$visit['sequence']],
+            'visit'=>[
+                'id'       => $visit['id'],
+                'date'     => $visit['visit_date'],
+                'sequence' => $visit['sequence'] ?? 1
+            ],
             'attachments'=>$atts
         ]);
     }
 
-    // GET /api/visit/by-date?uid=250001&date=YYYY-MM-DD
+    /**
+     * GET /api/visit/by-date?uid=250001&date=YYYY-MM-DD
+     */
     public function byDate()
     {
         $uid  = trim((string)$this->request->getGet('uid'));
@@ -243,23 +281,31 @@ class VisitController extends BaseController
         if (!preg_match('/^\d{6}$/',$uid)) return $this->bad(400,'uid_required');
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) return $this->bad(400,'bad_date');
 
-        $mode  = $this->visitKeyMode();
+        $mode   = $this->visitKeyMode();
+        $hasSeq = $this->hasSequence();
+        $hasCA  = $this->hasCreatedAt();
+
         if ($mode === 'pet_id') {
             $petId = $this->db->table('pets')->select('id')->where('unique_id',$uid)->get()->getRow('id');
-            $visit = $this->db->table('visits')
-                ->where(['pet_id'=>$petId,'visit_date'=>$date])
-                ->orderBy('sequence','DESC')->get()->getRowArray();
+            $q = $this->db->table('visits')->where(['pet_id'=>$petId,'visit_date'=>$date]);
         } else {
-            $visit = $this->db->table('visits')
-                ->where([$mode=>$uid,'visit_date'=>$date])
-                ->orderBy('sequence','DESC')->get()->getRowArray();
+            $q = $this->db->table('visits')->where([$mode=>$uid,'visit_date'=>$date]);
         }
+        if     ($hasSeq) $q = $q->orderBy('sequence','DESC');
+        elseif ($hasCA)  $q = $q->orderBy('created_at','DESC');
+        else             $q = $q->orderBy('id','DESC');
+
+        $visit = $q->get()->getRowArray();
         if (!$visit) return $this->ok(['ok'=>true,'visit'=>null,'attachments'=>[]]);
 
         $atts = $this->db->table('attachments')->where('visit_id',$visit['id'])->orderBy('id','ASC')->get()->getResultArray();
         return $this->ok([
             'ok'=>true,
-            'visit'=>['id'=>$visit['id'],'date'=>$visit['visit_date'],'sequence'=>$visit['sequence']],
+            'visit'=>[
+                'id'       => $visit['id'],
+                'date'     => $visit['visit_date'],
+                'sequence' => $visit['sequence'] ?? 1
+            ],
             'attachments'=>$atts
         ]);
     }
