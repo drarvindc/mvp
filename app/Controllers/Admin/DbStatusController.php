@@ -21,7 +21,11 @@ class DbStatusController extends BaseController
         }
 
         $migrations = \Config\Services::migrations();
-        $pendingFiles = array_keys($migrations->findMigrations());
+        $found = $migrations->findMigrations(); // [path => class]
+        $pendingFiles = [];
+        foreach (array_keys($found) as $path) {
+            $pendingFiles[] = basename($path);
+        }
 
         return view('admin/dbstatus/index', [
             'now'           => Time::now('Asia/Kolkata')->toDateTimeString(),
