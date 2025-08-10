@@ -23,26 +23,27 @@ class MediaController extends Controller
     }
 
     // Offline QR via Endroid v5
-    public function qrUid()
-    {
-        $uid = $this->request->getGet('uid');
-        if (!$uid) return $this->response->setStatusCode(400)->setBody('Missing uid');
+public function qrUid()
+{
+    $uid = $this->request->getGet('uid');
+    if (!$uid) return $this->response->setStatusCode(400)->setBody('Missing uid');
 
-        $size   = min(600, max(120, (int)($this->request->getGet('size') ?? 220)));
-        $margin = min(10,  max(0,   (int)($this->request->getGet('m')    ?? 4)));
+    $size   = min(600, max(120, (int)($this->request->getGet('size') ?? 220)));
+    $margin = min(10,  max(0,   (int)($this->request->getGet('m')    ?? 4)));
 
-        $result = Builder::create()
-            ->writer(new PngWriter())
-            ->data($uid)
-            ->errorCorrectionLevel(ErrorCorrectionLevel::LOW())
-            ->size($size)
-            ->margin($margin)
-            ->build();
+    $result = \Endroid\QrCode\Builder\Builder::create()
+        ->writer(new \Endroid\QrCode\Writer\PngWriter())
+        ->data($uid)
+        // ->errorCorrectionLevel(...)   // ← delete this line
+        ->size($size)
+        ->margin($margin)
+        ->build();
 
-        return $this->response
-            ->setHeader('Content-Type', $result->getMimeType())
-            ->setBody($result->getString());
-    }
+    return $this->response
+        ->setHeader('Content-Type', $result->getMimeType())
+        ->setBody($result->getString());
+}
+
 
     // Code128 barcode via Picqer (offline)
     public function barcodeUid()
