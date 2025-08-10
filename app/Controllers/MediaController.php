@@ -19,7 +19,6 @@ class MediaController extends BaseController
         $height = max(30, (int)($this->request->getGet('h') ?? 60));
 
         $gen = new BarcodeGeneratorPNG();
-        // TYPE_CODE_128 is good for scanners; width is via scale param
         $png = $gen->getBarcode($uid, $gen::TYPE_CODE_128, $scale, $height);
 
         return $this->response->setContentType('image/png')->setBody($png);
