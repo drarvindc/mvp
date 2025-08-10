@@ -1,0 +1,6 @@
+CREATE TABLE clinic_settings (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  `key` VARCHAR(120) UNIQUE NOT NULL,
+  `value` TEXT NULL,
+  updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
