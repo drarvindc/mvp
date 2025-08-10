@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manage Templates – Certificate Editor (Mockup)</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --muted:#6b7280; --primary:#3b82f6; --border:#e5e7eb;
+    --header:#111827; --chip:#eef2ff; --chip-text:#3730a3;
+  }
+  *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  body{margin:0;background:var(--bg);color:#111;}
+  .topbar{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;display:flex;gap:16px;align-items:center;justify-content:space-between;}
+  .topbar .actions{display:flex;gap:8px;align-items:center;}
+  .btn{padding:8px 12px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer}
+  .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .btn.ghost{background:transparent}
+  .chip{display:inline-flex;align-items:center;background:var(--chip);color:var(--chip-text);padding:4px 8px;border-radius:999px;font-size:12px;margin-left:6px}
+  .layout{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;max-width:1400px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .card .header{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600}
+  .card .body{padding:14px 16px}
+  .search{display:flex;gap:8px}
+  input[type="text"], select, textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:#fff}
+  .list{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:calc(100vh - 260px);overflow:auto}
+  .list .item{padding:10px 10px;border:1px solid var(--border);border-radius:10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+  .list .item .meta{font-size:12px;color:var(--muted)}
+  .editor-grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .toolbar .btn{font-size:14px}
+  .editable{min-height:360px;border:1px solid var(--border);border-radius:10px;padding:14px;background:#fff}
+  .token-panel{border-left:1px dashed var(--border);padding-left:0}
+  .token-group{border-bottom:1px solid var(--border)}
+  .token-group .tg-header{padding:10px 14px;font-weight:600;background:#fafafa}
+  .token-group .tg-body{padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .token{border:1px dashed var(--border);border-radius:8px;padding:6px 8px;font-family:ui-monospace,Menlo,monospace;font-size:12px;cursor:pointer;background:#fff}
+  .preview{margin-top:14px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:12px}
+  .muted{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div>
+      <strong style="font-size:18px">Manage Templates</strong>
+      <span class="chip">Certificates</span>
+      <span class="chip">Reports</span>
+      <span class="chip">Letters</span>
+    </div>
+    <div class="actions">
+      <button class="btn">Preview</button>
+      <button class="btn">Download PDF</button>
+      <button class="btn primary">Save Template</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT: Template list & filters -->
+    <div class="card">
+      <div class="header">Templates</div>
+      <div class="body">
+        <div class="search">
+          <input type="text" placeholder="Search templates…">
+          <select>
+            <option>All Categories</option>
+            <option>Certificates</option>
+            <option>Reports</option>
+            <option>Letters</option>
+          </select>
+        </div>
+        <div class="list">
+          <div class="item">
+            <div>
+              <div><strong>Fitness Certificate</strong></div>
+              <div class="meta">Certificate • Updated 09 Aug 2025</div>
+            </div>
+            <div class="meta">Active</div>
+          </div>
+          <div class="item">
+            <div>
+              <div><strong>Travel Certificate (Intl.)</strong></div>
+              <div class="meta">Certificate • Updated 02 Aug 2025</div>
+            </div>
+            <div class="meta">Active</div>
+          </div>
+          <div class="item">
+            <div>
+              <div><strong>Vaccination Status Report</strong></div>
+              <div class="meta">Report • Updated 28 Jul 2025</div>
+            </div>
+            <div class="meta">Inactive</div>
+          </div>
+          <div class="item">
+            <div>
+              <div><strong>Referral Letter</strong></div>
+              <div class="meta">Letter • Updated 14 Jun 2025</div>
+            </div>
+            <div class="meta">Active</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Editor + Token sidebar -->
+    <div class="card">
+      <div class="header">Certificate Editor</div>
+      <div class="body">
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+          <input type="text" placeholder="Template name: e.g., Fitness Certificate">
+          <select style="max-width:220px">
+            <option>Certificates</option>
+            <option>Reports</option>
+            <option>Letters</option>
+          </select>
+          <label class="muted" style="display:flex;gap:6px;align-items:center">
+            <input type="checkbox" checked> Active
+          </label>
+        </div>
+
+        <div class="editor-grid">
+          <div>
+            <div class="toolbar">
+              <button class="btn">B</button>
+              <button class="btn">I</button>
+              <button class="btn">U</button>
+              <button class="btn">H1</button>
+              <button class="btn">H2</button>
+              <button class="btn">• List</button>
+              <button class="btn">1. List</button>
+              <button class="btn">Align L</button>
+              <button class="btn">Align C</button>
+              <button class="btn">Align R</button>
+              <button class="btn">Insert Image</button>
+              <button class="btn">Table</button>
+            </div>
+            <div class="editable" contenteditable="true">
+              <h2 style="text-align:center;margin:0 0 8px">FITNESS CERTIFICATE</h2>
+              <p style="text-align:center;margin:0 0 14px">{{CLINIC_NAME}} • {{CLINIC_ADDRESS}} • {{CLINIC_MOBILE}}</p>
+              <p>Date: <strong>{{VISIT_DATE}}</strong></p>
+              <p>This is to certify that <strong>{{PET_NAME}}</strong>, a <strong>{{SPECIES}}</strong> (Breed: {{BREED}}), aged {{AGE}}, 
+              owned by {{OWNER_NAME}}, was examined by the undersigned and found to be clinically fit for travel.</p>
+              <p>Vaccination status: {{VACCINATION_STATUS}}</p>
+              <p>Remarks: {{CUSTOM}}</p>
+              <p style="margin-top:36px">______________________________<br>
+              {{DOCTOR_FULL_NAME}} &nbsp; Reg: {{DOCTOR_REGISTRATION_NUMBER}}</p>
+            </div>
+
+            <div class="preview">
+              <div class="muted">Live Preview (mock)</div>
+              <div style="border:1px dashed var(--border);padding:8px;margin-top:6px">
+                <h3 style="margin:0 0 8px">FITNESS CERTIFICATE</h3>
+                <p>Metro Vet Multispeciality Pet Clinic • Pune • +91 7020241565</p>
+                <p>Date: 2025-08-09</p>
+                <p>This is to certify that <strong>Bella</strong>, a <strong>Canine</strong> (Breed: Labrador), aged 3 years 2 months, owned by John Doe, was examined...</p>
+                <p>Vaccination status: Rabies (due 2026‑05‑12), DHPPi (done 2025‑06‑01)</p>
+                <p>Remarks: Fit for travel.</p>
+                <p style="margin-top:24px">______________________________<br>
+                Dr. Arvind Chauhan &nbsp; Reg: MVS‑2024‑1234</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Token sidebar -->
+          <div class="token-panel">
+            <div class="token-group">
+              <div class="tg-header">Owner</div>
+              <div class="tg-body">
+                <div class="token">{{OWNER_NAME}}</div>
+                <div class="token">{{OWNER_MOBILE}}</div>
+                <div class="token">{{OWNER_ADDRESS}}</div>
+                <div class="token">{{OWNER_EMAIL}}</div>
+              </div>
+            </div>
+            <div class="token-group">
+              <div class="tg-header">Pet</div>
+              <div class="tg-body">
+                <div class="token">{{PET_NAME}}</div>
+                <div class="token">{{SPECIES}}</div>
+                <div class="token">{{BREED}}</div>
+                <div class="token">{{AGE}}</div>
+                <div class="token">{{MICROCHIP_NUMBER}}</div>
+              </div>
+            </div>
+            <div class="token-group">
+              <div class="tg-header">Visit / Preventive</div>
+              <div class="tg-body">
+                <div class="token">{{VISIT_DATE}}</div>
+                <div class="token">{{VACCINATION_STATUS}}</div>
+                <div class="token">{{DEWORMING_STATUS}}</div>
+                <div class="token">{{TICK_FLEA_STATUS}}</div>
+              </div>
+            </div>
+            <div class="token-group">
+              <div class="tg-header">Clinic & Doctor</div>
+              <div class="tg-body">
+                <div class="token">{{CLINIC_NAME}}</div>
+                <div class="token">{{CLINIC_ADDRESS}}</div>
+                <div class="token">{{CLINIC_MOBILE}}</div>
+                <div class="token">{{DOCTOR_FULL_NAME}}</div>
+                <div class="token">{{DOCTOR_REGISTRATION_NUMBER}}</div>
+              </div>
+            </div>
+            <div class="token-group">
+              <div class="tg-header">Custom Inputs</div>
+              <div class="tg-body">
+                <div class="token">{{CUSTOM}}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
