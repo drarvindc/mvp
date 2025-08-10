@@ -36,6 +36,8 @@ $routes->group('admin/tools', static function ($routes) {
     $routes->get('migrate', 'Admin\\MigrateController::index');
     $routes->get('api-tester', 'Admin\\Tools\\ApiTester::index');
 	$routes->get('api-tester-android', 'Admin\\Tools\\ApiTesterAndroid::index');
+	$routes->get('api-tester-android-classic', 'Admin\Tools\ApiTesterAndroidClassic::index');
+
 });
 
 // ---------------------------
