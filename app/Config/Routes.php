@@ -27,6 +27,14 @@ $routes->get('visit/today', 'Api\\VisitController::today');
 $routes->get('visit/by-date', 'Api\\VisitController::byDate');
 });
 
+// ... keep your existing routes above
+
+$routes->post('api/visit/open',   'VisitController::open');
+$routes->post('api/visit/upload', 'VisitController::upload');
+$routes->get('api/visit/today',   'VisitController::today');
+
+// ... keep your existing routes below
+
 // Minimal admin viewer (your 'adminauth' filter already exists)
 $routes->get('admin/visit/view', 'Admin\\VisitViewController::view', ['filter'=>'adminauth']);
 $routes->get('admin/visit/file', 'Admin\\VisitViewController::file', ['filter'=>'adminauth']);
