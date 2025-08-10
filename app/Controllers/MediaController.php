@@ -1,7 +1,11 @@
 <?php namespace App\Controllers;
 
 use App\Controllers\BaseController;
-use App\Libraries\Barcode128;
+use Picqer\Barcode\BarcodeGeneratorPNG;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelLow;
 
 class MediaController extends BaseController
 {
@@ -11,11 +15,14 @@ class MediaController extends BaseController
         if (!preg_match('/^\d{6}$/',$uid)) {
             return $this->response->setStatusCode(400)->setBody('Invalid UID');
         }
-        $height = intval($this->request->getGet('h') ?? 60);
-        $scale  = intval($this->request->getGet('s') ?? 2);
-        $gen = new Barcode128();
-        $gen->renderPng($uid, $height, $scale);
-        return;
+        $scale  = max(1, (int)($this->request->getGet('s') ?? 2));
+        $height = max(30, (int)($this->request->getGet('h') ?? 60));
+
+        $gen = new BarcodeGeneratorPNG();
+        // TYPE_CODE_128 is good for scanners; width is via scale param
+        $png = $gen->getBarcode($uid, $gen::TYPE_CODE_128, $scale, $height);
+
+        return $this->response->setContentType('image/png')->setBody($png);
     }
 
     public function qrUid()
@@ -24,11 +31,18 @@ class MediaController extends BaseController
         if ($uid === '') {
             return $this->response->setStatusCode(400)->setBody('Invalid UID');
         }
-        $size = intval($this->request->getGet('size') ?? 6);
-        $margin = intval($this->request->getGet('m') ?? 1);
-        require_once APPPATH.'ThirdParty/phpqrcode/qrlib.php';
-        // Using fallback QR generator; replace with local library for offline use.
-        QRcode_png($uid, $size, $margin);
-        return;
+        $size   = min(600, max(120, (int)($this->request->getGet('size') ?? 200)));
+        $margin = min(10,  max(0,   (int)($this->request->getGet('m') ?? 2)));
+
+        $qr = QrCode::create($uid)
+            ->setEncoding(new Encoding('UTF-8'))
+            ->setErrorCorrectionLevel(new ErrorCorrectionLevelLow())
+            ->setSize($size)
+            ->setMargin($margin);
+
+        $writer = new PngWriter();
+        $result = $writer->write($qr);
+
+        return $this->response->setContentType('image/png')->setBody($result->getString());
     }
 }
