@@ -1,16 +1,16 @@
-Vet Clinic — Same-day Visits Dashboard
-Generated: 2025-08-10T20:10:26.294334
+Visits Lite — no-auth dashboard
+Generated: 2025-08-10T20:31:14.557216
 
-Includes:
-- API: /api/visit/today supports ?all=1 (already in VisitController here)
-- Admin UI: /admin/visits?uid=250001&date=YYYY-MM-DD with pill selector for Visit #1/#2
+What this adds
+- A lightweight admin page at /index.php/admin/visits-lite
+- No auth filter; avoids redirects you saw on /admin/visits
+- The page uses JS to call /api/visit/today?all=1 and render pill selector + attachments
 
-Files:
-- app/Controllers/VisitController.php
-- app/Controllers/Admin/Visits.php
-- app/Models/VisitModel.php
-- app/Views/admin/visits_dashboard.php
-- ROUTES_TO_ADD.txt
+Install
+1) Unzip at project root (merges into app/...).
+2) Add the route shown in ROUTES_TO_ADD.txt to app/Config/Routes.php.
+3) Open: /index.php/admin/visits-lite?uid=250001&date=2025-08-10
 
-Notes:
-- Assumes you already have PatientModel and attachments table + admin/visit/file handler.
+Notes
+- It does not touch your DB models or filters.
+- Attachment links point to /index.php/admin/visit/file?id=... as in your existing system.

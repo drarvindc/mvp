@@ -33,6 +33,7 @@ $routes->get('api/visit/today',   'VisitController::today');
 
 $routes->get('admin/visits', 'Admin\\Visits::index', ['filter'=>'adminauth']);
 $routes->get('api/visit/today', 'VisitController::today');
+$routes->get('admin/visits-lite', 'Admin\\VisitsLite::index');
 
 
 
