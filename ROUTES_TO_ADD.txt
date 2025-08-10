@@ -1,3 +1,3 @@
-Add this outside any adminauth group in app/Config/Routes.php:
+Add this route outside adminauth group:
 
-$routes->get('admin/tools/api-tester-android-classic', 'Admin\Tools\ApiTesterAndroidClassic::index');
+$routes->get('admin/tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index');
