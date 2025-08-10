@@ -23,3 +23,9 @@ class Filters extends BaseConfig
     public $methods = [];
     public $filters = [];
 }
+
+public $aliases = [
+    // ...
+    'apiauth' => \App\Filters\ApiAuthFilter::class,
+];
+
