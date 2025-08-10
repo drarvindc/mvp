@@ -1,16 +1,15 @@
-Visits Lite — no-auth dashboard
-Generated: 2025-08-10T20:31:14.557216
+Visits-Lite (public) – avoids admin filters
+Generated: 2025-08-10T20:36:28.114908
 
-What this adds
-- A lightweight admin page at /index.php/admin/visits-lite
-- No auth filter; avoids redirects you saw on /admin/visits
-- The page uses JS to call /api/visit/today?all=1 and render pill selector + attachments
+This adds a public, no-auth page at /index.php/visits-lite that renders same-day visits with a pill selector.
 
-Install
-1) Unzip at project root (merges into app/...).
-2) Add the route shown in ROUTES_TO_ADD.txt to app/Config/Routes.php.
-3) Open: /index.php/admin/visits-lite?uid=250001&date=2025-08-10
+Files:
+- app/Controllers/VisitsLite.php
+- app/Views/visitslite/index.php
 
-Notes
-- It does not touch your DB models or filters.
-- Attachment links point to /index.php/admin/visit/file?id=... as in your existing system.
+Routes:
+- Add: $routes->get('visits-lite', 'VisitsLite::index');  (place it NOT inside admin group)
+
+Notes:
+- The page calls /index.php/api/visit/today?uid=...&all=1 via fetch().
+- If your today() endpoint ignores &date, the page filters client side.

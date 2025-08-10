@@ -31,6 +31,9 @@ $routes->post('api/visit/open',   'VisitController::open');
 $routes->post('api/visit/upload', 'VisitController::upload');
 $routes->get('api/visit/today',   'VisitController::today');
 
+$routes->get('visits-lite', 'VisitsLite::index');
+
+
 $routes->get('admin/visits', 'Admin\\Visits::index', ['filter'=>'adminauth']);
 $routes->get('api/visit/today', 'VisitController::today');
 $routes->get('admin/visits-lite', 'Admin\\VisitsLite::index');
