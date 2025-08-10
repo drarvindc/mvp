@@ -1,19 +1,12 @@
 <?php
-/* Minimal embedded PHP QR Code (version-lite) */
-class QRImage {
-    public static function png($text, $size=4, $margin=1){
-        if (!function_exists('imagecreatetruecolor')){
-            header('HTTP/1.1 500 Internal Server Error'); echo 'GD not available'; return;
-        }
-        // simple fallback using Google Chart if GD not available (but here we assume GD)
-    }
-}
-/* NOTE: For production, replace with a full phpqrcode library (qrlib.php).
-   Here we implement a tiny passthrough to Google Chart as a fallback if needed. */
-function QRcode_png($text, $size=4, $margin=1){
-    $enc = urlencode($text);
+/*
+ * Tiny QR Fallback
+ * This is a minimal wrapper around a small QR generation using Google Charts as last resort
+ * Replace with full phpqrcode library when needed.
+ */
+function qr_png($text, $size=200, $margin=2){
+    // Try GD-less fallback via Google Charts (may be blocked by host)
     header('Content-Type: image/png');
-    // Fallback external rendering (works if outbound allowed). Replace with local library later.
-    readfile("https://chart.googleapis.com/chart?chs=".($size*25)."x".($size*25)."&cht=qr&chld=L|{$margin}&chl={$enc}");
+    $enc = urlencode($text);
+    readfile("https://chart.googleapis.com/chart?chs={$size}x{$size}&cht=qr&chld=L|{$margin}&chl={$enc}");
 }
-?>

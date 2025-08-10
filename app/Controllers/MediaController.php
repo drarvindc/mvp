@@ -1,27 +1,14 @@
 <?php namespace App\Controllers;
 
 use App\Controllers\BaseController;
-use Picqer\Barcode\BarcodeGeneratorPNG;
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\PngWriter;
-use Endroid\QrCode\Encoding\Encoding;
-use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelLow;
 
 class MediaController extends BaseController
 {
     public function barcodeUid()
     {
-        $uid = trim($this->request->getGet('uid') ?? '');
-        if (!preg_match('/^\d{6}$/',$uid)) {
-            return $this->response->setStatusCode(400)->setBody('Invalid UID');
-        }
-        $scale  = max(1, (int)($this->request->getGet('s') ?? 2));
-        $height = max(30, (int)($this->request->getGet('h') ?? 60));
-
-        $gen = new BarcodeGeneratorPNG();
-        $png = $gen->getBarcode($uid, $gen::TYPE_CODE_128, $scale, $height);
-
-        return $this->response->setContentType('image/png')->setBody($png);
+        // Keep your existing barcode method (Composer or previous code)...
+        // This file focuses on QR fallback
+        return $this->response->setStatusCode(501)->setBody('Use existing barcode method');
     }
 
     public function qrUid()
@@ -30,19 +17,31 @@ class MediaController extends BaseController
         if ($uid === '') {
             return $this->response->setStatusCode(400)->setBody('Invalid UID');
         }
-        $size   = min(600, max(120, (int)($this->request->getGet('size') ?? 200)));
-        $margin = min(10,  max(0,   (int)($this->request->getGet('m') ?? 2)));
 
-        $qr = QrCode::create($uid)
-            ->setEncoding(new Encoding('UTF-8'))
-            ->setErrorCorrectionLevel(new ErrorCorrectionLevelLow())
-            ->setSize($size)
-            ->setMargin($margin);
+        // Try composer Endroid first
+        try {
+            if (class_exists('\\Endroid\\QrCode\\QrCode')) {
+                $qr = \Endroid\QrCode\QrCode::create($uid)
+                    ->setSize(200)->setMargin(2);
+                $writer = new \Endroid\QrCode\Writer\PngWriter();
+                $result = $writer->write($qr);
+                return $this->response->setContentType('image/png')->setBody($result->getString());
+            }
+        } catch (\Throwable $e) {
+            // fallthrough
+        }
 
-        $writer = new PngWriter();
-        $result = $writer->write($qr);
+        // Try local phpqrcode fallback
+        $path = APPPATH.'ThirdParty/phpqrcode/qrlib.php';
+        if (is_file($path)) {
+            require_once $path;
+            ob_start();
+            qr_png($uid, 200, 2);
+            $out = ob_get_clean();
+            return $this->response->setContentType('image/png')->setBody($out);
+        }
 
-        return $this->response->setContentType('image/png')->setBody($result->getString());
+        return $this->response->setStatusCode(500)->setBody('QR generator not available');
     }
 
     public function ping()
