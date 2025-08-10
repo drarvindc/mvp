@@ -1,15 +1,19 @@
-Visits-Lite (public) – avoids admin filters
-Generated: 2025-08-10T20:36:28.114908
+Hotfix Package — 2025-08-10T20:54:57.167486
 
-This adds a public, no-auth page at /index.php/visits-lite that renders same-day visits with a pill selector.
+Includes:
+- app/Config/Routes.php (optimized groups; public visits-lite; admin/tools/api-tester)
+- app/Controllers/Api/VisitController.php (schema-aligned: pets.unique_id, visits, documents; supports date & all=1)
+- app/Controllers/VisitsLite.php (public page controller)
+- app/Views/visitslite/index.php (fixes $this->request in view; pill UI)
+- app/Controllers/Admin/Tools/ApiTester.php + view (restores API tester at /admin/tools/api-tester?key=...)
 
-Files:
-- app/Controllers/VisitsLite.php
-- app/Views/visitslite/index.php
+How to install:
+1) Unzip into your project root (merges into app/...). 
+2) Visit API tester:
+   /index.php/admin/tools/api-tester?key=arvindrchauhan1723
+3) Public visits viewer:
+   /index.php/visits-lite?uid=250001&date=2025-08-10
 
-Routes:
-- Add: $routes->get('visits-lite', 'VisitsLite::index');  (place it NOT inside admin group)
-
-Notes:
-- The page calls /index.php/api/visit/today?uid=...&all=1 via fetch().
-- If your today() endpoint ignores &date, the page filters client side.
+Upload endpoint:
+POST {site_url('api/visit/upload')}
+Fields: uid, [visitId optional], [type optional], file (multipart), [backfill=1 default]

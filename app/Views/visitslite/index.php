@@ -1,78 +1,117 @@
+<?php
+/** @var string $uid */
+/** @var string $date */
+$uid  = isset($uid) ? $uid : '';
+$date = isset($date) ? $date : date('Y-m-d');
+?>
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Visits Lite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; }
-    .pill { display:inline-block; padding:8px 14px; border:1px solid #ccc; border-radius:999px; margin-right:8px; cursor:pointer; }
-    .pill.active { background:#eee; }
-    .muted { color:#666; }
-    .row { margin: 10px 0; }
-    .cards { display:flex; flex-wrap:wrap; gap:10px; }
-    .card { border:1px solid #ddd; border-radius:8px; padding:10px; width:300px; }
-    a.button { display:inline-block; padding:6px 10px; border:1px solid #333; border-radius:6px; text-decoration:none; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 16px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pillbar { display: flex; gap: 8px; margin: 12px 0; }
+    .pill { padding: 8px 12px; border: 1px solid #ccc; border-radius: 999px; cursor: pointer; }
+    .pill.active { background: #eee; border-color: #999; }
+    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin: 8px 0; }
+    .muted { color: #666; }
+    a.button { display: inline-block; padding: 6px 10px; border: 1px solid #888; border-radius: 6px; text-decoration: none; }
+    label { font-weight: 600; }
+    input, button { padding: 6px 8px; }
   </style>
 </head>
 <body>
-  <h2>Visits – quick view</h2>
+  <h2>Visits Lite</h2>
+
   <div class="row">
-    <label>UID: <input id="uid" value="<?= esc($this->request->getGet('uid') ?? '') ?>"></label>
-    <label>Date: <input id="date" type="date" value="<?= esc($this->request->getGet('date') ?? date('Y-m-d')) ?>"></label>
+    <label>UID:</label>
+    <input id="uid" value="<?= htmlspecialchars($uid, ENT_QUOTES) ?>" />
+    <label>Date:</label>
+    <input id="date" type="date" value="<?= htmlspecialchars($date, ENT_QUOTES) ?>" />
     <button id="load">Load</button>
   </div>
-  <div id="pills" class="row"></div>
-  <div id="content" class="cards"></div>
 
-<script>
-async function fetchToday(uid, date) {
-  const url = `<?= site_url('api/visit/today'); ?>?uid=${encodeURIComponent(uid)}&date=${encodeURIComponent(date)}&all=1`;
-  const resp = await fetch(url);
-  return await resp.json();
-}
-function render(data){
-  const pills = document.getElementById('pills');
-  const content = document.getElementById('content');
-  pills.innerHTML = ''; content.innerHTML='';
-  if(!data.ok || !data.results || data.results.length===0){
-    content.innerHTML = '<div class="muted">No visits found for the given UID/date.</div>';
-    return;
+  <div id="status" class="muted">Enter UID and Date, then Load.</div>
+  <div id="pills" class="pillbar"></div>
+  <div id="content"></div>
+
+  <script>
+  function q(sel){ return document.querySelector(sel); }
+  function ce(tag){ return document.createElement(tag); }
+
+  async function fetchVisits(uid, date) {
+    const url = `<?= site_url('api/visit/today') ?>?uid=${encodeURIComponent(uid)}&date=${encodeURIComponent(date)}&all=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    return res.json();
   }
-  data.results.forEach((v,idx)=>{
-    const p = document.createElement('span');
-    p.className = 'pill' + (idx===0?' active':'');
-    p.textContent = 'Visit #' + v.sequence + (v.sequence===1?' (AM)':' (PM)');
-    p.onclick = ()=>{
-      document.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
-      p.classList.add('active');
-      showVisit(v);
-    };
-    pills.appendChild(p);
+
+  function render(data) {
+    const pills = q('#pills'); pills.innerHTML = '';
+    const content = q('#content'); content.innerHTML = '';
+
+    if (!data.ok || !data.results || data.results.length === 0) {
+      q('#status').textContent = 'No visits found for the given UID/date.';
+      return;
+    }
+    q('#status').textContent = `Found ${data.results.length} visit(s) for ${data.date}`;
+
+    data.results.forEach((v, idx) => {
+      const p = ce('button');
+      p.className = 'pill' + (idx===0 ? ' active' : '');
+      p.textContent = `Visit #${v.sequence}` + (v.sequence === 1 ? ' (AM)' : (v.sequence === 2 ? ' (PM)' : ''));
+      p.addEventListener('click', () => {
+        document.querySelectorAll('.pill').forEach(el => el.classList.remove('active'));
+        p.classList.add('active');
+        renderVisit(v);
+      });
+      pills.appendChild(p);
+    });
+
+    renderVisit(data.results[0]);
+
+    function renderVisit(v) {
+      content.innerHTML = '';
+      const head = ce('div');
+      head.className = 'card';
+      head.innerHTML = `<strong>Visit #${v.sequence}</strong> · ${v.date}`;
+      content.appendChild(head);
+
+      if (!v.documents || v.documents.length === 0) {
+        const empty = ce('div');
+        empty.className = 'muted';
+        empty.textContent = 'No documents for this visit.';
+        content.appendChild(empty);
+      } else {
+        v.documents.forEach(d => {
+          const card = ce('div');
+          card.className = 'card';
+          card.innerHTML = `<div><strong>${d.type || 'file'}</strong> — ${d.filename || ''}</div>
+                            <div class="muted">${d.created_at || ''} · ${d.filesize || ''} bytes</div>
+                            <div style="margin-top:6px"><a class="button" target="_blank" href="${d.url}">Open</a></div>`;
+          content.appendChild(card);
+        });
+      }
+    }
+  }
+
+  q('#load').addEventListener('click', async () => {
+    const uid = q('#uid').value.trim();
+    const date = q('#date').value.trim();
+    q('#status').textContent = 'Loading...';
+    try {
+      const data = await fetchVisits(uid, date);
+      render(data);
+    } catch (e) {
+      q('#status').textContent = 'Error: ' + e.message;
+    }
   });
-  showVisit(data.results[0]);
-}
-function showVisit(v){
-  const content = document.getElementById('content');
-  content.innerHTML = '';
-  const card = document.createElement('div');
-  card.className = 'card';
-  const list = (v.attachments||[]).map(a=>{
-    const href = `<?= site_url('admin/visit/file'); ?>?id=${encodeURIComponent(a.id)}`;
-    return `<li>${a.type||'doc'} — <a class="button" href="${href}" target="_blank">Open</a> <span class="muted">${a.filename||''}</span></li>`;
-  }).join('');
-  card.innerHTML = `<div><strong>Date:</strong> ${v.date}</div><div><strong>Sequence:</strong> #${v.sequence}</div><div><strong>Attachments</strong><ul>${list||'<li class=muted>None</li>'}</ul></div>`;
-  content.appendChild(card);
-}
-document.getElementById('load').onclick = async ()=>{
-  const uid = document.getElementById('uid').value.trim();
-  const date = document.getElementById('date').value;
-  const data = await fetchToday(uid, date);
-  render(data);
-};
-// auto load if params present
-const paramUid = document.getElementById('uid').value.trim();
-if(paramUid){ document.getElementById('load').click(); }
-</script>
+
+  // auto-load if uid prefilled
+  if (q('#uid').value) q('#load').click();
+  </script>
 </body>
 </html>

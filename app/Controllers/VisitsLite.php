@@ -1,11 +1,17 @@
-<?php namespace App\Controllers;
+<?php
 
-use App\Controllers\BaseController;
+namespace App\Controllers;
 
 class VisitsLite extends BaseController
 {
     public function index()
     {
-        return view('visitslite/index');
+        $uid  = trim((string) $this->request->getGet('uid'));
+        $date = trim((string) ($this->request->getGet('date') ?? date('Y-m-d')));
+
+        return view('visitslite/index', [
+            'uid'  => $uid,
+            'date' => $date,
+        ]);
     }
 }
