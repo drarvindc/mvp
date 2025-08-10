@@ -1,0 +1,6 @@
+Add this line to app/Config/Routes.php (outside the adminauth group):
+
+$routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index');
+
+Usage:
+/index.php/admin/tools/api-tester-android?key=arvindrchauhan1723

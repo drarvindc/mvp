@@ -26,6 +26,8 @@ $routes->group('api', static function ($routes) {
     $routes->post('visit/open', 'Api\\VisitController::open');
     $routes->post('visit/upload', 'Api\\VisitController::upload');
     $routes->get('visit/today', 'Api\\VisitController::today'); // supports ?all=1 and optional &date=YYYY-MM-DD
+	$routes->get('admin/tools/api-tester-android', 'Admin\\Tools\\ApiTesterAndroid::index');
+
 });
 
 // ---------------------------
