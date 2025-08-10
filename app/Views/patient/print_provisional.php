@@ -8,6 +8,8 @@
   <style>
     @media print { .no-print { display:none; } }
     .letter { padding: 24px; }
+    .codes { display:flex; gap:20px; align-items:center; margin:8px 0 16px; }
+    .codes img { border:1px solid #ddd; padding:4px; background:#fff; }
   </style>
 </head>
 <body>
@@ -15,6 +17,10 @@
   <h3>Clinic Letterhead</h3>
   <p>Date: <?= date('Y-m-d') ?></p>
   <p>Unique ID: <strong><?= esc($uid ?? 'TBD') ?></strong></p>
+  <div class="codes">
+    <img src="<?= site_url('media/barcode-uid?uid=' . urlencode($uid ?? '000000')) ?>" alt="Barcode" height="60">
+    <img src="<?= site_url('media/qr-uid?uid=' . urlencode($uid ?? '')) ?>" alt="QR" width="120" height="120">
+  </div>
   <?php if(!empty($pet)): ?>
     <p>Pet: <?= esc($pet['pet_name'] ?? '') ?> (Owner: <?= esc(($pet['first_name'] ?? '') . ' ' . ($pet['last_name'] ?? '')) ?>)</p>
   <?php endif; ?>
