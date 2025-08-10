@@ -1,5 +1,4 @@
-# API Tester (browser-based)
-Open: /admin/tools/api-tester (requires adminauth) then:
-- Paste ANDROID_API_TOKEN from .env
-- Enter UID
-- Click buttons to Open / Upload / Get Today
+# Upload API Fix Pack
+1) Copy files into project root
+2) Run migrations (web or CLI)
+3) Test via /admin/tools/api-tester

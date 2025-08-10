@@ -18,7 +18,6 @@ class VisitController extends BaseController
     private function ok($data){ return $this->response->setJSON($data); }
     private function bad(int $code, string $msg){ return $this->response->setStatusCode($code)->setJSON(['ok'=>false,'error'=>$msg]); }
 
-    /** Determine which column the visits table uses to reference the patient. */
     private function visitKeyMode(): string
     {
         $fields = [];
@@ -26,25 +25,19 @@ class VisitController extends BaseController
         if (in_array('unique_id', $fields, true)) return 'unique_id';
         if (in_array('uid',       $fields, true)) return 'uid';
         if (in_array('pet_id',    $fields, true)) return 'pet_id';
-        // safest fallback
         return 'unique_id';
     }
-
-    /** Whether visits table has a 'sequence' column (multi-visit/day). */
     private function hasSequence(): bool
     {
         try { return in_array('sequence', array_map('strtolower', $this->db->getFieldNames('visits')), true); }
         catch (\Throwable $e) { return false; }
     }
-
-    /** Whether visits table has 'created_at' column (ordering fallback). */
     private function hasCreatedAt(): bool
     {
         try { return in_array('created_at', array_map('strtolower', $this->db->getFieldNames('visits')), true); }
         catch (\Throwable $e) { return false; }
     }
 
-    /** Get (or create) today's visit for a UID, handling different schemas. */
     private function ensureTodayVisit(string $uid, bool $forceNew = false): array
     {
         $today  = date('Y-m-d');
@@ -52,42 +45,30 @@ class VisitController extends BaseController
         $hasSeq = $this->hasSequence();
         $hasCA  = $this->hasCreatedAt();
 
-        // Try existing (unless forcing a new visit)
         if (!$forceNew) {
             if ($mode === 'pet_id') {
                 $petId = $this->db->table('pets')->select('id')->where('unique_id',$uid)->get()->getRow('id');
                 if ($petId) {
                     $q = $this->db->table('visits')->where(['pet_id'=>$petId,'visit_date'=>$today]);
-                    if ($hasSeq)      $q = $q->orderBy('sequence','DESC');
-                    elseif ($hasCA)   $q = $q->orderBy('created_at','DESC');
-                    else              $q = $q->orderBy('id','DESC');
+                    $q = $hasSeq ? $q->orderBy('sequence','DESC') : ($hasCA ? $q->orderBy('created_at','DESC') : $q->orderBy('id','DESC'));
                     $row = $q->get()->getRowArray();
                     if ($row) return [$row, false];
                 }
             } else {
                 $q = $this->db->table('visits')->where([$mode=>$uid,'visit_date'=>$today]);
-                if     ($hasSeq) $q = $q->orderBy('sequence','DESC');
-                elseif ($hasCA)  $q = $q->orderBy('created_at','DESC');
-                else             $q = $q->orderBy('id','DESC');
+                $q = $hasSeq ? $q->orderBy('sequence','DESC') : ($hasCA ? $q->orderBy('created_at','DESC') : $q->orderBy('id','DESC'));
                 $row = $q->get()->getRowArray();
                 if ($row) return [$row, false];
             }
         }
 
-        // Build insert payload
-        $insert = [
-            'visit_date' => $today,
-        ];
-        if ($this->hasCreatedAt()) {
-            $insert['created_at'] = Time::now($this->tz)->toDateTimeString();
-        }
+        $insert = ['visit_date'=>$today];
+        if ($this->hasCreatedAt()) $insert['created_at'] = Time::now($this->tz)->toDateTimeString();
         if ($mode === 'pet_id') {
             $insert['pet_id'] = $this->db->table('pets')->select('id')->where('unique_id',$uid)->get()->getRow('id');
         } else {
             $insert[$mode] = $uid;
         }
-
-        // Compute sequence if supported
         if ($hasSeq) {
             if ($mode === 'pet_id') {
                 $maxSeq = (int)($this->db->table('visits')->selectMax('sequence','s')->where(['pet_id'=>$insert['pet_id'],'visit_date'=>$today])->get()->getRow('s') ?? 0);
@@ -130,17 +111,12 @@ class VisitController extends BaseController
         ];
     }
 
-    /**
-     * POST /api/visit/open
-     * JSON: { "uid": "250001" }
-     */
     public function open()
     {
         $json = $this->request->getJSON(true);
         $uid  = trim($json['uid'] ?? '');
         if (!preg_match('/^\d{6}$/',$uid)) return $this->bad(400,'uid_required');
 
-        // Ensure pet exists
         $exists = $this->db->table('pets')->select('unique_id')->where('unique_id',$uid)->get()->getRowArray();
         if (!$exists) return $this->bad(404,'uid_not_found');
 
@@ -161,10 +137,6 @@ class VisitController extends BaseController
         ]);
     }
 
-    /**
-     * POST /api/visit/upload
-     * multipart: uid, type, file, note?, forceNewVisit?
-     */
     public function upload()
     {
         $uid   = trim((string)$this->request->getPost('uid'));
@@ -189,11 +161,12 @@ class VisitController extends BaseController
 
         [$visit, $created] = $this->ensureTodayVisit($uid, $force);
 
-        // storage path: /storage/patients/{YYYY}/{UID}/
         $y    = date('Y');
         $dmy  = date('dmy');
         $base = rtrim(ROOTPATH, '/')."/storage/patients/{$y}/{$uid}";
         if (!is_dir($base)) { @mkdir($base, 0775, true); }
+
+        $mime = $file->getClientMimeType() ?: $file->getMimeType();
 
         $seq = 1;
         $candidate = "{$dmy}-{$type}-{$uid}.{$ext}";
@@ -208,13 +181,12 @@ class VisitController extends BaseController
             return $this->bad(500,'upload_failed');
         }
 
-        // DB row
         $this->db->table('attachments')->insert([
             'visit_id'   => $visit['id'],
             'type'       => $type,
             'filename'   => $candidate,
             'filesize'   => @filesize($path) ?: null,
-            'mime'       => $file->getMimeType(),
+            'mime'       => $mime ?: null,
             'note'       => $note ?: null,
             'created_at' => Time::now($this->tz)->toDateTimeString(),
         ]);
@@ -233,9 +205,6 @@ class VisitController extends BaseController
         ]);
     }
 
-    /**
-     * GET /api/visit/today?uid=250001
-     */
     public function today()
     {
         $uid = trim((string)$this->request->getGet('uid'));
@@ -271,9 +240,6 @@ class VisitController extends BaseController
         ]);
     }
 
-    /**
-     * GET /api/visit/by-date?uid=250001&date=YYYY-MM-DD
-     */
     public function byDate()
     {
         $uid  = trim((string)$this->request->getGet('uid'));
