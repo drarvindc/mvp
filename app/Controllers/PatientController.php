@@ -41,7 +41,9 @@ class PatientController extends BaseController
                     ->select('p.id as pet_id, p.unique_id, p.pet_name, p.gender, p.status, p.owner_id, p.species_id, p.breed_id, s.name as species, b.name as breed')
                     ->join('species s','s.id = p.species_id','left')
                     ->join('breeds b','b.id = p.breed_id','left')
-                    ->where('p.owner_id', $ownerId)->get()->getResultArray();
+                    ->where('p.owner_id', $ownerId)
+                    ->orderBy('p.unique_id','asc')
+                    ->get()->getResultArray();
             }
 
             return view('patient/review', [
@@ -52,22 +54,31 @@ class PatientController extends BaseController
             ]);
         }
 
-        // MOBILE MODE (assumes storage without country code)
+        // MOBILE MODE (store mobiles WITHOUT country code; compare last 10 digits)
         $digits = preg_replace('/\D+/', '', $q);
         if ($digits === '') {
             return redirect()->back()->with('error','Invalid mobile format.');
         }
         $last10 = substr($digits, -10);
 
-        $results = $this->db->table('pets p')
-            ->select('p.id as pet_id, p.unique_id, p.pet_name, p.gender, p.status, p.owner_id, p.species_id, p.breed_id, o.first_name, o.last_name, s.name as species, b.name as breed')
-            ->join('owners o','o.id = p.owner_id','left')
-            ->join('owner_mobiles m','m.owner_id = o.id','left')
-            ->join('species s','s.id = p.species_id','left')
-            ->join('breeds b','b.id = p.breed_id','left')
-            ->where('m.mobile_e164', $last10)
-            ->groupBy('p.id')
-            ->get()->getResultArray();
+        // Step 1: owner_ids where any mobile equals last10
+        $ownerRows = $this->db->table('owner_mobiles')
+            ->select('owner_id')->where('mobile_e164', $last10)->get()->getResultArray();
+        $ownerIds = [];
+        foreach ($ownerRows as $r) { $ownerIds[] = (int)$r['owner_id']; }
+        $ownerIds = array_values(array_unique($ownerIds));
+
+        // Step 2: all pets for those owner_ids
+        $results = [];
+        if (!empty($ownerIds)) {
+            $results = $this->db->table('pets p')
+                ->select('p.id as pet_id, p.unique_id, p.pet_name, p.gender, p.status, p.owner_id, p.species_id, p.breed_id, s.name as species, b.name as breed')
+                ->join('species s','s.id = p.species_id','left')
+                ->join('breeds b','b.id = p.breed_id','left')
+                ->whereIn('p.owner_id', $ownerIds)
+                ->orderBy('p.unique_id','asc')
+                ->get()->getResultArray();
+        }
 
         return view('patient/review', [
             'query'   => $q,
@@ -127,7 +138,9 @@ class PatientController extends BaseController
         $seq = (int)$counterRow['last_seq'];
         $uid = $yearTwo . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
 
-        $exist = $this->db->table('owner_mobiles')->select('owner_id')->where('mobile_e164', substr($digits,-10))->get()->getRowArray();
+        // Recheck owner by exact 10-digit mobile
+        $last10 = substr($digits,-10);
+        $exist = $this->db->table('owner_mobiles')->select('owner_id')->where('mobile_e164', $last10)->get()->getRowArray();
         if ($exist) {
             $ownerId = (int)$exist['owner_id'];
         } else {
@@ -146,7 +159,7 @@ class PatientController extends BaseController
 
             $this->db->table('owner_mobiles')->insert([
                 'owner_id'   => $ownerId,
-                'mobile_e164'=> substr($digits,-10),
+                'mobile_e164'=> $last10,
                 'is_primary' => 1,
                 'is_verified'=> 0,
                 'created_at' => Time::now('Asia/Kolkata')->toDateTimeString(),
@@ -188,5 +201,18 @@ class PatientController extends BaseController
         $mobile = trim($this->request->getGet('mobile') ?? '');
         $unique = trim($this->request->getGet('uid') ?? '');
         return view('patient/print_provisional', ['mobile' => $mobile, 'uid' => $unique]);
+    }
+
+    // --- DEBUG JSON: /patient/debug/by-mobile?m=9876543210 ---
+    public function debugByMobile()
+    {
+        $m = substr(preg_replace('/\D+/','',$this->request->getGet('m') ?? ''), -10);
+        $owners = $this->db->table('owner_mobiles')->select('owner_id')->where('mobile_e164',$m)->get()->getResultArray();
+        $ownerIds = array_values(array_unique(array_map(fn($r)=>(int)$r['owner_id'], $owners)));
+        $pets = [];
+        if (!empty($ownerIds)) {
+            $pets = $this->db->table('pets')->select('unique_id, pet_name, owner_id')->whereIn('owner_id',$ownerIds)->orderBy('unique_id','asc')->get()->getResultArray();
+        }
+        return $this->response->setJSON(['mobile'=>$m,'ownerIds'=>$ownerIds,'pets'=>$pets]);
     }
 }

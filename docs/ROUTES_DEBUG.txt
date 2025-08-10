@@ -1,0 +1,3 @@
+<?php
+// Add this debug route (optional) to app/Config/Routes.php for quick JSON verify:
+$routes->get('patient/debug/by-mobile', 'PatientController::debugByMobile');
