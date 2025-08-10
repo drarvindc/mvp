@@ -1,20 +1,16 @@
-Vet Clinic — Force New Visit package
-Generated: 2025-08-10T20:04:23.584317
+Vet Clinic — Same-day Visits Dashboard
+Generated: 2025-08-10T20:10:26.294334
 
-What this adds
-- Support for creating multiple visits on the same date via /api/visit/open with forceNewVisit=1
-- Safer sequencing with DB transaction + FOR UPDATE
-- /api/visit/today supports ?all=1 to list all same-day visits including attachments
-- Attachment upload filenames include -v{sequence} when sequence > 1
+Includes:
+- API: /api/visit/today supports ?all=1 (already in VisitController here)
+- Admin UI: /admin/visits?uid=250001&date=YYYY-MM-DD with pill selector for Visit #1/#2
 
-Install
-1) Unzip into your project root so the 'app' directory merges.
-2) Run migration:
-   php spark migrate -n App
+Files:
+- app/Controllers/VisitController.php
+- app/Controllers/Admin/Visits.php
+- app/Models/VisitModel.php
+- app/Views/admin/visits_dashboard.php
+- ROUTES_TO_ADD.txt
 
-Routes to add
-See ROUTES_TO_ADD.txt (you only need to paste the three lines).
-
-Notes
-- Assumes you already have PatientModel with 'uid' field; and 'attachments' table + admin/visit/file handler.
-- Storage path uses WRITEPATH/patients/YYYY/UID.
+Notes:
+- Assumes you already have PatientModel and attachments table + admin/visit/file handler.

@@ -8,10 +8,6 @@ class VisitController extends ResourceController
 {
     protected $format = 'json';
 
-    /**
-     * POST /api/visit/open
-     * Params: uid, forceNewVisit (optional: 1/true/yes/on)
-     */
     public function open()
     {
         $uid   = trim((string) $this->request->getVar('uid'));
@@ -45,7 +41,6 @@ class VisitController extends ResourceController
         $db = \Config\Database::connect();
         $db->transStart();
 
-        // Lock rows to compute next sequence safely
         $row = $db->query(
             'SELECT COALESCE(MAX(sequence), 0) AS last_seq
                FROM visits
@@ -81,8 +76,6 @@ class VisitController extends ResourceController
 
     /**
      * POST /api/visit/upload
-     * Params: visitId, type (rx|lab|img|other...), file (multipart)
-     * Saves to /storage/patients/YYYY/UID/ and records in attachments.
      */
     public function upload()
     {
@@ -108,13 +101,11 @@ class VisitController extends ResourceController
         $date    = $visit['date'];
         $yyyy    = substr($date, 0, 4);
 
-        // Make dir: /writable/patients/YYYY/UID/
         $base = WRITEPATH . 'patients' . DIRECTORY_SEPARATOR . $yyyy . DIRECTORY_SEPARATOR . $uid;
         if (!is_dir($base)) {
             @mkdir($base, 0775, true);
         }
 
-        // Filename: DDMMYY-{type}-{uid}[-v{seq}].ext
         $ddmmyy   = date('dmy', strtotime($date));
         $ext      = strtolower($file->getExtension() ?: pathinfo($file->getName(), PATHINFO_EXTENSION));
         $seq      = (int) $visit['sequence'];
@@ -125,7 +116,6 @@ class VisitController extends ResourceController
         $file->move($base, $filename, true);
         $fullpath = $base . DIRECTORY_SEPARATOR . $filename;
 
-        // Save attachment
         $db = \Config\Database::connect();
         $db->table('attachments')->insert([
             'visit_id'   => $visitId,
@@ -136,8 +126,6 @@ class VisitController extends ResourceController
         ]);
 
         $attachId = $db->insertID();
-
-        // Public (or admin) URL to serve the file; adapt to your route/controller if different
         $url = site_url('admin/visit/file?id=' . $attachId);
 
         return $this->respond([
@@ -155,8 +143,6 @@ class VisitController extends ResourceController
 
     /**
      * GET /api/visit/today?uid=XXXX[&all=1]
-     * When all=1, returns all visits for today; otherwise latest only.
-     * Includes attachments for returned visits.
      */
     public function today()
     {

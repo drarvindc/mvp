@@ -27,6 +27,13 @@ $routes->get('visit/today', 'Api\\VisitController::today');
 $routes->get('visit/by-date', 'Api\\VisitController::byDate');
 });
 
+$routes->post('api/visit/open',   'VisitController::open');
+$routes->post('api/visit/upload', 'VisitController::upload');
+$routes->get('api/visit/today',   'VisitController::today');
+
+$routes->get('admin/visits', 'Admin\\Visits::index');
+
+
 // ... keep your existing routes above
 
 $routes->post('api/visit/open',   'VisitController::open');
