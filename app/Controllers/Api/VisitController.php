@@ -1,160 +1,228 @@
 <?php namespace App\Controllers\Api;
 
-use CodeIgniter\RESTful\ResourceController;
+use App\Controllers\BaseController;
+use CodeIgniter\I18n\Time;
 
-class VisitController extends ResourceController
+class VisitController extends BaseController
 {
-    protected $format = 'json';
+    protected $db;
+    protected $tz = 'Asia/Kolkata';
 
-    public function open($uid = null)
+    public function __construct()
     {
-        if (!$this->checkAuth()) {
-            return $this->failUnauthorized('Invalid token');
-        }
+        $this->db = \Config\Database::connect();
+        date_default_timezone_set($this->tz);
+        helper(['filesystem']);
+    }
 
-        $db = \Config\Database::connect();
-        $pet = $db->table('pets')->where('unique_id', $uid)->get()->getRow();
+    private function ok($data){ return $this->response->setJSON($data); }
+    private function bad($code, $msg){ return $this->response->setStatusCode($code)->setJSON(['ok'=>false,'error'=>$msg]); }
 
-        if (!$pet) {
-            return $this->failNotFound("Pet with UID $uid not found");
-        }
-
+    private function ensureTodayVisit(string $uid, bool $forceNew = false): array
+    {
         $today = date('Y-m-d');
-        $visit = $db->table('visits')
-            ->where('pet_id', $pet->id)
-            ->where('visit_date', $today)
-            ->get()
-            ->getRow();
 
-        if (!$visit) {
-            $db->table('visits')->insert([
-                'pet_id' => $pet->id,
-                'visit_date' => $today,
-                'created_at' => date('Y-m-d H:i:s')
-            ]);
-            $visitId = $db->insertID();
-        } else {
-            $visitId = $visit->id;
+        if (!$forceNew) {
+            $row = $this->db->table('visits')
+                ->where(['uid'=>$uid,'visit_date'=>$today])
+                ->orderBy('sequence','DESC')
+                ->get()->getRowArray();
+            if ($row) return [$row, false];
         }
 
-        return $this->respond([
-            'ok' => true,
-            'visit_id' => $visitId,
-            'pet' => $pet
+        $maxSeq = (int)($this->db->table('visits')
+            ->selectMax('sequence','s')
+            ->where(['uid'=>$uid,'visit_date'=>$today])
+            ->get()->getRow('s') ?? 0);
+
+        $seq = $maxSeq + 1;
+
+        $this->db->table('visits')->insert([
+            'uid'        => $uid,
+            'visit_date' => $today,
+            'sequence'   => $seq,
+            'created_at' => Time::now($this->tz)->toDateTimeString(),
+        ]);
+
+        $id  = $this->db->insertID();
+        $row = $this->db->table('visits')->where('id',$id)->get()->getRowArray();
+
+        return [$row, true];
+    }
+
+    private function getPetOwnerBasics(string $uid): array
+    {
+        $pet = $this->db->table('pets p')
+            ->select('p.unique_id, p.pet_name, s.name as species, b.name as breed, o.first_name, o.last_name')
+            ->join('owners o','o.id = p.owner_id','left')
+            ->join('species s','s.id = p.species_id','left')
+            ->join('breeds b','b.id = p.breed_id','left')
+            ->where('p.unique_id',$uid)->get()->getRowArray();
+        if (!$pet) return [];
+
+        $ownerId = $this->db->table('pets')->select('owner_id')->where('unique_id',$uid)->get()->getRow('owner_id');
+        $mobile  = $this->db->table('owner_mobiles')->select('mobile_e164')->where(['owner_id'=>$ownerId,'is_primary'=>1])->get()->getRow('mobile_e164');
+
+        return [
+            'pet'=>[
+                'unique_id'=>$pet['unique_id'],
+                'name'=>$pet['pet_name'] ?? null,
+                'species'=>$pet['species'] ?? null,
+                'breed'=>$pet['breed'] ?? null,
+            ],
+            'owner'=>[
+                'name'=>trim(($pet['first_name']??'').' '.($pet['last_name']??'')) ?: null,
+                'mobile'=>$mobile ?: null
+            ]
+        ];
+    }
+
+    // POST /api/visit/open   JSON: { "uid": "250001" }
+    public function open()
+    {
+        $json = $this->request->getJSON(true);
+        $uid  = trim($json['uid'] ?? '');
+        if (!preg_match('/^\d{6}$/',$uid)) return $this->bad(400,'uid_required');
+
+        $exists = $this->db->table('pets')->select('unique_id')->where('unique_id',$uid)->get()->getRowArray();
+        if (!$exists) return $this->bad(404,'uid_not_found');
+
+        [$visit, $created] = $this->ensureTodayVisit($uid, false);
+        $basics = $this->getPetOwnerBasics($uid);
+
+        return $this->ok([
+            'ok'=>true,
+            'visit'=>[
+                'id'=>$visit['id'],
+                'uid'=>$visit['uid'],
+                'date'=>$visit['visit_date'],
+                'sequence'=>$visit['sequence'],
+                'wasCreated'=>$created,
+            ],
+            'pet'=>$basics['pet'] ?? null,
+            'owner'=>$basics['owner'] ?? null,
         ]);
     }
 
+    // POST /api/visit/upload   multipart: uid, type, file, note?, forceNewVisit?
     public function upload()
     {
-        if (!$this->checkAuth()) {
-            return $this->failUnauthorized('Invalid token');
-        }
+        $uid   = trim((string)$this->request->getPost('uid'));
+        $type  = strtolower(trim((string)$this->request->getPost('type')));
+        $note  = trim((string)$this->request->getPost('note'));
+        $force = filter_var($this->request->getPost('forceNewVisit'), FILTER_VALIDATE_BOOLEAN);
 
-        $uid  = $this->request->getPost('uid');
-        $type = $this->request->getPost('type') ?? 'doc';
+        if (!preg_match('/^\d{6}$/',$uid)) return $this->bad(400,'uid_required');
+        $allowedTypes = ['rx','photo','doc','xray','lab','usg','invoice'];
+        if (!in_array($type, $allowedTypes, true)) return $this->bad(415,'unsupported_type');
+
         $file = $this->request->getFile('file');
+        if (!$file || !$file->isValid()) return $this->bad(400,'file_required');
 
-        if (!$uid || !$file->isValid()) {
-            return $this->failValidationError('UID and valid file required');
-        }
+        $ext = strtolower($file->getExtension());
+        $allowedExt = ['jpg','jpeg','png','pdf','webp'];
+        if (!in_array($ext,$allowedExt,true)) return $this->bad(415,'unsupported_media_type');
+        if ($file->getSize() > 10*1024*1024) return $this->bad(413,'file_too_large');
 
-        $db = \Config\Database::connect();
-        $pet = $db->table('pets')->where('unique_id', $uid)->get()->getRow();
-        if (!$pet) {
-            return $this->failNotFound("Pet with UID $uid not found");
-        }
+        $exists = $this->db->table('pets')->select('unique_id')->where('unique_id',$uid)->get()->getRowArray();
+        if (!$exists) return $this->bad(404,'uid_not_found');
 
-        // Ensure visit exists
-        $today = date('Y-m-d');
-        $visit = $db->table('visits')
-            ->where('pet_id', $pet->id)
-            ->where('visit_date', $today)
-            ->get()
-            ->getRow();
+        [$visit, $created] = $this->ensureTodayVisit($uid, $force);
 
-        if (!$visit) {
-            $db->table('visits')->insert([
-                'pet_id' => $pet->id,
-                'visit_date' => $today,
-                'created_at' => date('Y-m-d H:i:s')
-            ]);
-            $visitId = $db->insertID();
-        } else {
-            $visitId = $visit->id;
-        }
+        // storage path: /storage/patients/{YYYY}/{UID}/
+        $y    = date('Y');
+        $dmy  = date('dmy');
+        $base = rtrim(ROOTPATH, '/')."/storage/patients/{$y}/{$uid}";
+        if (!is_dir($base)) { @mkdir($base, 0775, true); }
 
-        // Build storage path
-        $year = date('Y');
-        $baseDir = WRITEPATH . "storage/patients/$year/$uid";
-        if (!is_dir($baseDir)) {
-            mkdir($baseDir, 0775, true);
-        }
-
-        $dmy = date('dmY');
-        $ext = $file->getExtension();
-        $seq = 0;
-        $candidate = "$dmy-$type-$uid.$ext";
-
-        while (file_exists("$baseDir/$candidate")) {
+        $seq = 1;
+        $candidate = "{$dmy}-{$type}-{$uid}.{$ext}";
+        while (file_exists("{$base}/{$candidate}")) {
             $seq++;
             $suffix = str_pad((string)$seq, 2, '0', STR_PAD_LEFT);
-            $candidate = "$dmy-$type-$uid-$suffix.$ext";
+            $candidate = "{$dmy}-{$type}-{$uid}-{$suffix}.{$ext}";
+        }
+        $path = "{$base}/{$candidate}";
+
+        if (!$file->move($base, $candidate, true)) {
+            return $this->bad(500,'upload_failed');
         }
 
-        $file->move($baseDir, $candidate);
-
-        // Record in DB
-        $db->table('visit_files')->insert([
-            'visit_id' => $visitId,
-            'file_type' => $type,
-            'file_path' => "$year/$uid/$candidate",
-            'uploaded_at' => date('Y-m-d H:i:s')
+        // DB row
+        $this->db->table('attachments')->insert([
+            'visit_id'  => $visit['id'],
+            'type'      => $type,
+            'filename'  => $candidate,
+            'filesize'  => @filesize($path) ?: null,
+            'mime'      => $file->getMimeType(),
+            'note'      => $note ?: null,
+            'created_at'=> Time::now($this->tz)->toDateTimeString(),
         ]);
+        $attId = $this->db->insertID();
 
-        return $this->respond([
-            'ok' => true,
-            'file' => $candidate,
-            'visit_id' => $visitId
+        return $this->response->setStatusCode(201)->setJSON([
+            'ok'=>true,
+            'visitId'=>$visit['id'],
+            'attachment'=>[
+                'id'=>$attId,
+                'type'=>$type,
+                'filename'=>$candidate,
+                'url'=> site_url("admin/visit/file?id={$attId}"),
+                'created_at'=> Time::now($this->tz)->toDateTimeString(),
+            ]
         ]);
     }
 
-    public function today($uid = null)
+    // GET /api/visit/today?uid=250001
+    public function today()
     {
-        if (!$this->checkAuth()) {
-            return $this->failUnauthorized('Invalid token');
-        }
-
-        $db = \Config\Database::connect();
-        $pet = $db->table('pets')->where('unique_id', $uid)->get()->getRow();
-        if (!$pet) {
-            return $this->failNotFound("Pet with UID $uid not found");
-        }
+        $uid = trim((string)$this->request->getGet('uid'));
+        if (!preg_match('/^\d{6}$/',$uid)) return $this->bad(400,'uid_required');
 
         $today = date('Y-m-d');
-        $visit = $db->table('visits')
-            ->where('pet_id', $pet->id)
-            ->where('visit_date', $today)
-            ->get()
-            ->getRow();
+        $visit = $this->db->table('visits')
+            ->where(['uid'=>$uid,'visit_date'=>$today])
+            ->orderBy('sequence','DESC')
+            ->get()->getRowArray();
 
-        if (!$visit) {
-            return $this->respond(['ok' => true, 'files' => []]);
-        }
+        if (!$visit) return $this->ok(['ok'=>true,'visit'=>null,'attachments'=>[]]);
 
-        $files = $db->table('visit_files')
-            ->where('visit_id', $visit->id)
-            ->get()
-            ->getResult();
+        $atts = $this->db->table('attachments')
+            ->where('visit_id',$visit['id'])
+            ->orderBy('id','ASC')
+            ->get()->getResultArray();
 
-        return $this->respond([
-            'ok' => true,
-            'files' => $files
+        return $this->ok([
+            'ok'=>true,
+            'visit'=>['id'=>$visit['id'],'date'=>$visit['visit_date'],'sequence'=>$visit['sequence']],
+            'attachments'=>$atts
         ]);
     }
 
-    private function checkAuth(): bool
+    // GET /api/visit/by-date?uid=250001&date=YYYY-MM-DD
+    public function byDate()
     {
-        $token = $this->request->getHeaderLine('X-Api-Key') ?: $this->request->getGetPost('token');
-        return $token && $token === getenv('ANDROID_API_TOKEN');
+        $uid  = trim((string)$this->request->getGet('uid'));
+        $date = trim((string)$this->request->getGet('date'));
+        if (!preg_match('/^\d{6}$/',$uid)) return $this->bad(400,'uid_required');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) return $this->bad(400,'bad_date');
+
+        $visit = $this->db->table('visits')
+            ->where(['uid'=>$uid,'visit_date'=>$date])
+            ->orderBy('sequence','DESC')
+            ->get()->getRowArray();
+
+        if (!$visit) return $this->ok(['ok'=>true,'visit'=>null,'attachments'=>[]]);
+
+        $atts = $this->db->table('attachments')
+            ->where('visit_id',$visit['id'])
+            ->orderBy('id','ASC')
+            ->get()->getResultArray();
+
+        return $this->ok([
+            'ok'=>true,
+            'visit'=>['id'=>$visit['id'],'date'=>$visit['visit_date'],'sequence'=>$visit['sequence']],
+            'attachments'=>$atts
+        ]);
     }
 }
