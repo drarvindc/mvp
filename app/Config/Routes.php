@@ -31,6 +31,9 @@ $routes->get('visit/by-date', 'Api\\VisitController::byDate');
 $routes->get('admin/visit/view', 'Admin\\VisitViewController::view', ['filter'=>'adminauth']);
 $routes->get('admin/visit/file', 'Admin\\VisitViewController::file', ['filter'=>'adminauth']);
 
+$routes->get('admin/tools/api-tester', 'Admin\\ApiTesterController::index', ['filter'=>'adminauth']);
+
+
 $routes->get('patient/debug/by-mobile', 'PatientController::debugByMobile');
 
 
