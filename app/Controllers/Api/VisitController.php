@@ -24,7 +24,7 @@ class VisitController extends BaseController
 
         if (!$forceNew) {
             $row = $this->db->table('visits')
-                ->where(['uid'=>$uid,'visit_date'=>$today])
+                ->where(['unique_id'=>$uid,'visit_date'=>$today])
                 ->orderBy('sequence','DESC')
                 ->get()->getRowArray();
             if ($row) return [$row, false];
@@ -32,13 +32,13 @@ class VisitController extends BaseController
 
         $maxSeq = (int)($this->db->table('visits')
             ->selectMax('sequence','s')
-            ->where(['uid'=>$uid,'visit_date'=>$today])
+            ->where(['unique_id'=>$uid,'visit_date'=>$today])
             ->get()->getRow('s') ?? 0);
 
         $seq = $maxSeq + 1;
 
         $this->db->table('visits')->insert([
-            'uid'        => $uid,
+            'unique_id'  => $uid,
             'visit_date' => $today,
             'sequence'   => $seq,
             'created_at' => Time::now($this->tz)->toDateTimeString(),
@@ -94,7 +94,7 @@ class VisitController extends BaseController
             'ok'=>true,
             'visit'=>[
                 'id'=>$visit['id'],
-                'uid'=>$visit['uid'],
+                'unique_id'=>$visit['unique_id'],
                 'date'=>$visit['visit_date'],
                 'sequence'=>$visit['sequence'],
                 'wasCreated'=>$created,
@@ -181,7 +181,7 @@ class VisitController extends BaseController
 
         $today = date('Y-m-d');
         $visit = $this->db->table('visits')
-            ->where(['uid'=>$uid,'visit_date'=>$today])
+            ->where(['unique_id'=>$uid,'visit_date'=>$today])
             ->orderBy('sequence','DESC')
             ->get()->getRowArray();
 
@@ -208,7 +208,7 @@ class VisitController extends BaseController
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) return $this->bad(400,'bad_date');
 
         $visit = $this->db->table('visits')
-            ->where(['uid'=>$uid,'visit_date'=>$date])
+            ->where(['unique_id'=>$uid,'visit_date'=>$date])
             ->orderBy('sequence','DESC')
             ->get()->getRowArray();
 
