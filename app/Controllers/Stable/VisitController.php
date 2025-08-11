@@ -107,20 +107,27 @@ class VisitController extends ResourceController
             return $this->respond(['ok'=>false,'error'=>'db_error'], 500);
         }
 
+        // Build storage path
         $yyyy = substr($date, 0, 4);
         $dir = rtrim(self::STORAGE_BASE, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $yyyy . DIRECTORY_SEPARATOR . $uid;
         if (!is_dir($dir) and !@mkdir($dir, 0775, true)) {
             return $this->respond(['ok'=>false,'error'=>'storage_unwritable'], 500);
         }
 
+        // ---- NAMING FIX (unique serial across ANY extension) ----
         $ddmmyy = date('dmy', strtotime($date));
         $base = "{$ddmmyy}-{$type}-{$uid}";
-        $name = $base . '.' . $ext;
-        $n=1;
-        while (file_exists($dir . DIRECTORY_SEPARATOR . $name)) {
-            $n+=1;
-            $name = sprintf("%s-%02d.%s", $base, $n, $ext);
-        }
+
+        // Count existing files with base or base-XX (across any extension)
+        $existing = glob($dir . DIRECTORY_SEPARATOR . $base . '.*');
+        $existing = array_merge($existing ?: [], glob($dir . DIRECTORY_SEPARATOR . $base . '-[0-9][0-9].*') ?: []);
+
+        // next serial = count(existing) + 1
+        $next = max(1, count($existing) + 1);
+
+        // Final name (always with -NN to avoid ambiguity)
+        $name = sprintf('%s-%02d.%s', $base, $next, $ext);
+        // --------------------------------------------------------
 
         try {
             $file->move($dir, $name, true);
@@ -131,7 +138,7 @@ class VisitController extends ResourceController
 
         $db = \Config\Database::connect();
 
-        // Build the row fully, then trim to existing columns so we don't fail on unknown cols.
+        // Adaptive insert (use only columns that exist)
         $row = [
             'visit_id'   => $visitId,
             'pet_id'     => (int)$pet['id'],
@@ -143,18 +150,12 @@ class VisitController extends ResourceController
             'created_at' => date('Y-m-d H:i:s'),
         ];
 
-        // Detect existing columns in `documents` and filter the row accordingly
-        try {
-            $fields = $db->getFieldNames('documents');
-        } catch (\Throwable $e) {
-            $fields = array_keys($row); // fallback: try full insert
-        }
+        try { $fields = $db->getFieldNames('documents'); } catch (\Throwable $e) { $fields = array_keys($row); }
         $filtered = array_intersect_key($row, array_flip($fields));
 
         try {
             $db->table('documents')->insert($filtered);
         } catch (\Throwable $e2) {
-            // As a last resort, keep only the most essential fields
             $essentials = ['visit_id','type','filename','filesize','created_at'];
             $filtered2 = array_intersect_key($row, array_flip($essentials));
             try {
