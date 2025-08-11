@@ -78,8 +78,3 @@ $routes->get('patient/provisional', 'PatientController::provisional');
 // Optional diagnostics (remove after testing)
 // $routes->get('testping', static fn()=> 'pong '.date('c'));
 // $routes->get('admin/tools/migrate/ping', static fn()=> 'migrate-route-ok');
-
-// --- Added by patch: public tester routes (keep outside adminauth) ---
-$routes->get('admin/tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index');
-$routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index');
-
