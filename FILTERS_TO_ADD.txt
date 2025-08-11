@@ -1,3 +1,2 @@
-In app/Config/Filters.php add alias under $aliases:
-
+// Add this under $aliases in app/Config/Filters.php
 'stableapiauth' => \App\Filters\StableApiAuthFilter::class,

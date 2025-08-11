@@ -19,6 +19,7 @@ class StableApiAuthFilter implements FilterInterface
         if (stripos($auth, 'Bearer ') === 0) {
             $token = trim(substr($auth, 7));
         } else {
+            // fallback for HTML forms
             $token = (string) $request->getGet('token') ?: (string) $request->getPost('token');
         }
 
@@ -29,5 +30,6 @@ class StableApiAuthFilter implements FilterInterface
 
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
     {
+        // no-op
     }
 }

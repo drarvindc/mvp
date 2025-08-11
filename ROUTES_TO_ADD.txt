@@ -1,12 +1,12 @@
-Add these routes (outside adminauth) to app/Config/Routes.php:
+// Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
+// This switches your main API to the Stable implementation that you just tested.
 
-// Stable API (protected by stableapiauth)
-$routes->group('stable-api', ['filter'=>'stableapiauth'], static function($routes) {
-    $routes->post('visit/open', 'Stable\VisitController::open');
-    $routes->post('visit/upload', 'Stable\VisitController::upload');
-    $routes->get('visit/today', 'Stable\VisitController::today');
-    $routes->get('visit/by-date', 'Stable\VisitController::byDate');
+// --- Stable API replacing main /api/visit/* ---
+$routes->group('api/visit', ['filter'=>'stableapiauth'], static function($routes) {
+    $routes->post('open',   'Stable\VisitController::open');
+    $routes->post('upload', 'Stable\VisitController::upload');
+    $routes->get('today',   'Stable\VisitController::today');
+    $routes->get('by-date', 'Stable\VisitController::byDate');
 });
 
-// Stable API tester (keyed)
-$routes->get('tools/stable-api-tester', 'Admin\Tools\StableApiTester::index');
+// Tip: If you still have older /api/visit/* routes defined elsewhere, comment them out so these take precedence.

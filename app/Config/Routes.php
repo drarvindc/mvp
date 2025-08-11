@@ -20,6 +20,16 @@ $routes->get('media/selftest', 'MediaController::selftest');
 $routes->get('media/qr-uid', 'MediaController::qrUid');
 $routes->get('media/barcode-uid', 'MediaController::barcodeUid');
 
+// --- Stable API replacing main /api/visit/* ---
+$routes->group('api/visit', ['filter'=>'stableapiauth'], static function($routes) {
+    $routes->post('open',   'Stable\VisitController::open');
+    $routes->post('upload', 'Stable\VisitController::upload');
+    $routes->get('today',   'Stable\VisitController::today');
+    $routes->get('by-date', 'Stable\VisitController::byDate');
+});
+
+// Tip: If you still have older /api/visit/* routes defined elsewhere, comment them out so these take precedence.
+
 // Stable API (protected)
 $routes->group('stable-api', ['filter'=>'stableapiauth'], static function($routes) {
     $routes->post('visit/open', 'Stable\VisitController::open');
@@ -101,4 +111,8 @@ $routes->get('patient/provisional', 'PatientController::provisional');
 // --- Added by patch: public tester routes (keep outside adminauth) ---
 $routes->get('admin/tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index');
 $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index');
+
+
+// Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
+// This switches your main API to the Stable implementation that you just tested.
 
