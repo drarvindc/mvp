@@ -23,6 +23,8 @@ $routes->get('media/barcode-uid', 'MediaController::barcodeUid');
 $routes->get('admin/tools/migrate-debug', 'Admin\Tools\MigrateDebug::index');
 $routes->get('admin/tools/migrate-debug-step', 'Admin\Tools\MigrateDebugStep::index');
 $routes->get('tools/visits-admin-view', 'Admin\\Visits::index'); // temporary mirror
+$routes->get('visits-lite', 'VisitsLite::index');
+
 
 
 // --- Stable API replacing main /api/visit/* ---
@@ -61,8 +63,6 @@ $routes->get('api/visit/today',   'VisitController::today');
 $routes->get('admin/visits', 'Admin\\Visits::index', ['filter'=>'adminauth']);
 $routes->get('api/visit/today', 'VisitController::today');
 $routes->get('admin/visits-lite', 'Admin\\VisitsLite::index');
-
-$routes->get('visits-lite', 'VisitsLite::index');
 
 
 
