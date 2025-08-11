@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers;
 
 class VisitsLite extends BaseController

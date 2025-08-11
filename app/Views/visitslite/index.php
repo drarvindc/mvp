@@ -10,33 +10,32 @@ $date = isset($date) ? $date : date('Y-m-d');
   <meta charset="utf-8">
   <title>Visits Lite</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 16px; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .pillbar { display: flex; gap: 8px; margin: 12px 0; }
-    .pill { padding: 8px 12px; border: 1px solid #ccc; border-radius: 999px; cursor: pointer; }
-    .pill.active { background: #eee; border-color: #999; }
-    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin: 8px 0; }
-    .muted { color: #666; }
-    a.button { display: inline-block; padding: 6px 10px; border: 1px solid #888; border-radius: 6px; text-decoration: none; }
-    label { font-weight: 600; }
-    input, button { padding: 6px 8px; }
+    .pill { padding: .4rem .9rem; border:1px solid #ced4da; border-radius: 999px; background:#f8f9fa; }
+    .pill.active { background:#e9ecef; border-color:#adb5bd; }
   </style>
 </head>
-<body>
-  <h2>Visits Lite</h2>
+<body class="container py-3">
+  <h4 class="mb-3">Visits Lite</h4>
 
-  <div class="row">
-    <label>UID:</label>
-    <input id="uid" value="<?= htmlspecialchars($uid, ENT_QUOTES) ?>" />
-    <label>Date:</label>
-    <input id="date" type="date" value="<?= htmlspecialchars($date, ENT_QUOTES) ?>" />
-    <button id="load">Load</button>
+  <div class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label">UID</label>
+      <input id="uid" class="form-control" value="<?= htmlspecialchars($uid, ENT_QUOTES) ?>" />
+    </div>
+    <div class="col-auto">
+      <label class="form-label">Date</label>
+      <input id="date" class="form-control" type="date" value="<?= htmlspecialchars($date, ENT_QUOTES) ?>" />
+    </div>
+    <div class="col-auto">
+      <button id="load" class="btn btn-primary">Load</button>
+    </div>
   </div>
 
-  <div id="status" class="muted">Enter UID and Date, then Load.</div>
-  <div id="pills" class="pillbar"></div>
-  <div id="content"></div>
+  <div id="status" class="text-muted mt-3">Enter UID and Date, then Load.</div>
+  <div id="pills" class="d-flex gap-2 mt-2 flex-wrap"></div>
+  <div id="content" class="mt-3"></div>
 
   <script>
   function q(sel){ return document.querySelector(sel); }
@@ -76,22 +75,23 @@ $date = isset($date) ? $date : date('Y-m-d');
     function renderVisit(v) {
       content.innerHTML = '';
       const head = ce('div');
-      head.className = 'card';
+      head.className = 'card card-body';
       head.innerHTML = `<strong>Visit #${v.sequence}</strong> · ${v.date}`;
       content.appendChild(head);
 
       if (!v.documents || v.documents.length === 0) {
         const empty = ce('div');
-        empty.className = 'muted';
+        empty.className = 'text-muted mt-2';
         empty.textContent = 'No documents for this visit.';
         content.appendChild(empty);
       } else {
         v.documents.forEach(d => {
           const card = ce('div');
-          card.className = 'card';
+          card.className = 'card card-body mt-2';
+          const size = d.filesize ? `${d.filesize} bytes` : '';
           card.innerHTML = `<div><strong>${d.type || 'file'}</strong> — ${d.filename || ''}</div>
-                            <div class="muted">${d.created_at || ''} · ${d.filesize || ''} bytes</div>
-                            <div style="margin-top:6px"><a class="button" target="_blank" href="${d.url}">Open</a></div>`;
+                            <div class="text-muted small">${(d.created_at || '')} ${size ? ' · '+size : ''}</div>
+                            <div class="mt-2"><a class="btn btn-sm btn-outline-primary" target="_blank" href="${d.url}">Open</a></div>`;
           content.appendChild(card);
         });
       }
