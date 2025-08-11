@@ -65,6 +65,10 @@ $routes->group('admin/tools', ['filter' => 'adminauth'], static function($routes
     $routes->post('migrate/run', 'Admin\MigrateController::run');
     $routes->post('migrate/rollback', 'Admin\MigrateController::rollback');
     $routes->post('migrate/seed-species', 'Admin\MigrateController::seedSpecies');
+	$routes->get('api-tester', 'Admin\\Tools\\ApiTester::index');
+	$routes->get('api-tester-android', 'Admin\\Tools\\ApiTesterAndroid::index');
+	$routes->get('api-tester-android-classic', 'Admin\Tools\ApiTesterAndroidClassic::index');
+	$routes->get('api-tester-classic', 'Admin\Tools\ApiTesterClassic::index');
     
     $routes->get('patient/intake', 'PatientController::intake');
 $routes->post('patient/find', 'PatientController::find');
