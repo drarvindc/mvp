@@ -10,6 +10,8 @@ class Filters extends BaseConfig
         'honeypot' => \CodeIgniter\Filters\Honeypot::class,
         'adminauth'=> \App\Filters\AdminAuth::class,
 		'apiauth' => \App\Filters\ApiAuthFilter::class,
+		'stableapiauth' => \App\Filters\StableApiAuthFilter::class,
+
     ];
 
     public $globals = [

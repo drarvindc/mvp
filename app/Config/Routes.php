@@ -20,6 +20,18 @@ $routes->get('media/selftest', 'MediaController::selftest');
 $routes->get('media/qr-uid', 'MediaController::qrUid');
 $routes->get('media/barcode-uid', 'MediaController::barcodeUid');
 
+// Stable API (protected)
+$routes->group('stable-api', ['filter'=>'stableapiauth'], static function($routes) {
+    $routes->post('visit/open', 'Stable\VisitController::open');
+    $routes->post('visit/upload', 'Stable\VisitController::upload');
+    $routes->get('visit/today', 'Stable\VisitController::today');
+    $routes->get('visit/by-date', 'Stable\VisitController::byDate');
+});
+
+// Stable tester (keyed)
+$routes->get('tools/stable-api-tester', 'Admin\Tools\StableApiTester::index');
+
+
 $routes->group('api', ['filter' => 'apiauth'], static function($routes){
 $routes->post('visit/open', 'Api\\VisitController::open');
 $routes->post('visit/upload', 'Api\\VisitController::upload');

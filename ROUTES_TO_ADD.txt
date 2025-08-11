@@ -1,3 +1,12 @@
-Add this route outside adminauth group:
+Add these routes (outside adminauth) to app/Config/Routes.php:
 
-$routes->get('admin/tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index');
+// Stable API (protected by stableapiauth)
+$routes->group('stable-api', ['filter'=>'stableapiauth'], static function($routes) {
+    $routes->post('visit/open', 'Stable\VisitController::open');
+    $routes->post('visit/upload', 'Stable\VisitController::upload');
+    $routes->get('visit/today', 'Stable\VisitController::today');
+    $routes->get('visit/by-date', 'Stable\VisitController::byDate');
+});
+
+// Stable API tester (keyed)
+$routes->get('tools/stable-api-tester', 'Admin\Tools\StableApiTester::index');
