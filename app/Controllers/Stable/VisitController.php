@@ -44,6 +44,19 @@ class VisitController extends ResourceController
         return ['id'=>$id,'pet_id'=>$petId,'visit_date'=>$date,'visit_seq'=>$next];
     }
 
+    protected function dmyToIso(?string $s): string
+    {
+        helper('datefmt');
+        $iso = dmy_to_iso($s);
+        return $iso ?: date('Y-m-d');
+    }
+
+    protected function isoToDmy(?string $s): string
+    {
+        helper('datefmt');
+        return iso_to_dmy($s) ?: date('d-m-Y');
+    }
+
     public function open()
     {
         $uid = trim((string)$this->request->getVar('uid'));
@@ -54,9 +67,9 @@ class VisitController extends ResourceController
         if (!$pet) return $this->respond(['ok'=>false,'error'=>'uid_not_found'], 404);
 
         $force = $this->toBool($this->request->getVar('forceNewVisit'));
-        $today = date('Y-m-d');
+        $iso = date('Y-m-d'); // always create for "today"
         try {
-            $visit = $this->ensureVisit((int)$pet['id'], $today, $force);
+            $visit = $this->ensureVisit((int)$pet['id'], $iso, $force);
         } catch (\Throwable $e) {
             return $this->respond(['ok'=>false,'error'=>'db_error'], 500);
         }
@@ -69,7 +82,7 @@ class VisitController extends ResourceController
             'visit'=>[
                 'id'=>(int)$visit['id'],
                 'uid'=>$uid,
-                'date'=>$today,
+                'date'=>$this->isoToDmy($iso), // dd-mm-yyyy
                 'sequence'=>$seq,
                 'wasCreated'=>$force
             ]
@@ -99,35 +112,28 @@ class VisitController extends ResourceController
         $pet = $this->findPetByUid($uid);
         if (!$pet) return $this->respond(['ok'=>false,'error'=>'uid_not_found'], 404);
 
-        $date = date('Y-m-d');
+        $iso = date('Y-m-d');
         try {
-            $visit = $this->ensureVisit((int)$pet['id'], $date, $force);
+            $visit = $this->ensureVisit((int)$pet['id'], $iso, $force);
             $visitId = (int)$visit['id'];
         } catch (\Throwable $e) {
             return $this->respond(['ok'=>false,'error'=>'db_error'], 500);
         }
 
-        // Build storage path
-        $yyyy = substr($date, 0, 4);
+        $yyyy = substr($iso, 0, 4);
         $dir = rtrim(self::STORAGE_BASE, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $yyyy . DIRECTORY_SEPARATOR . $uid;
         if (!is_dir($dir) and !@mkdir($dir, 0775, true)) {
             return $this->respond(['ok'=>false,'error'=>'storage_unwritable'], 500);
         }
 
-        // ---- NAMING FIX (unique serial across ANY extension) ----
-        $ddmmyy = date('dmy', strtotime($date));
+        // Unique serial across ANY extension
+        $ddmmyy = date('dmy', strtotime($iso));
         $base = "{$ddmmyy}-{$type}-{$uid}";
-
-        // Count existing files with base or base-XX (across any extension)
-        $existing = glob($dir . DIRECTORY_SEPARATOR . $base . '.*');
-        $existing = array_merge($existing ?: [], glob($dir . DIRECTORY_SEPARATOR . $base . '-[0-9][0-9].*') ?: []);
-
-        // next serial = count(existing) + 1
+        $existing = glob($dir . DIRECTORY_SEPARATOR . $base . '.*') ?: [];
+        $existing2 = glob($dir . DIRECTORY_SEPARATOR . $base . '-[0-9][0-9].*') ?: [];
+        $existing = array_merge($existing, $existing2);
         $next = max(1, count($existing) + 1);
-
-        // Final name (always with -NN to avoid ambiguity)
         $name = sprintf('%s-%02d.%s', $base, $next, $ext);
-        // --------------------------------------------------------
 
         try {
             $file->move($dir, $name, true);
@@ -138,7 +144,6 @@ class VisitController extends ResourceController
 
         $db = \Config\Database::connect();
 
-        // Adaptive insert (use only columns that exist)
         $row = [
             'visit_id'   => $visitId,
             'pet_id'     => (int)$pet['id'],
@@ -182,15 +187,18 @@ class VisitController extends ResourceController
     public function today()
     {
         $uid = trim((string)$this->request->getGet('uid'));
-        $date = trim((string)($this->request->getGet('date') ?: date('Y-m-d')));
+        $dateIn = trim((string)($this->request->getGet('date') ?: date('Y-m-d')));
         $all = $this->toBool($this->request->getGet('all'));
 
         if (!preg_match('/^\d{6}$/', $uid)) return $this->respond(['ok'=>false,'error'=>'uid_invalid'], 400);
         $pet = $this->findPetByUid($uid);
         if (!$pet) return $this->respond(['ok'=>false,'error'=>'uid_not_found'], 404);
 
+        // Accept dd-mm-yyyy or yyyy-mm-dd
+        $isoDate = $this->dmyToIso($dateIn);
+
         $db = \Config\Database::connect();
-        $qb = $db->table('visits')->where(['pet_id'=>(int)$pet['id'],'visit_date'=>$date]);
+        $qb = $db->table('visits')->where(['pet_id'=>(int)$pet['id'],'visit_date'=>$isoDate]);
         $visits = $all ? $qb->orderBy('visit_seq','ASC')->get()->getResultArray()
                        : $qb->orderBy('visit_seq','DESC')->get(1)->getResultArray();
 
@@ -210,13 +218,13 @@ class VisitController extends ResourceController
             }
             $out[] = [
                 'id'=>(int)$v['id'],
-                'date'=>$v['visit_date'],
+                'date'=>$this->isoToDmy($v['visit_date']),
                 'sequence'=>(int)$v['visit_seq'],
                 'documents'=>$doclist
             ];
         }
 
-        return $this->respond(['ok'=>true,'date'=>$date,'results'=>$out], 200);
+        return $this->respond(['ok'=>true,'date'=>$this->isoToDmy($isoDate),'results'=>$out], 200);
     }
 
     public function byDate()
