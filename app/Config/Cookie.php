@@ -6,31 +6,23 @@ use CodeIgniter\Config\BaseConfig;
 
 class Cookie extends BaseConfig
 {
-    /** String prefix for all cookie names (must be a string, empty is fine) */
+    // MUST be a string (empty string is fine)
     public $prefix   = '';
 
-    /** Cookie domain (empty = current host) */
+    // Domain and path
     public $domain   = '';
-
-    /** Cookie path */
     public $path     = '/';
 
-    /** Only send cookies over HTTPS */
-    public $secure   = true;
+    // Security flags
+    public $secure   = true;   // HTTPS only
+    public $httponly = true;   // not accessible to JS
 
-    /** Prevent JS access */
-    public $httponly = true;
+    // SameSite policy (string) — your CI core expects lower-case property "samesite"
+    public $samesite = 'Lax';  // 'Lax' | 'Strict' | 'None'
 
-    /**
-     * SameSite policy (NOTE: lower-case property name is required by your CI core)
-     * Allowed: 'Lax', 'Strict', 'None'
-     */
-    public $samesite = 'Lax';
+    // Whether to send cookies without URL-encoding their values
+    public $raw      = false;
 
-    /**
-     * Default cookie lifetime in seconds.
-     * 0 = session cookie (expires when browser closes).
-     * Your “Remember me” logic will set an explicit expiry.
-     */
+    // Default lifetime in seconds (0 = session cookie)
     public $expires  = 0;
 }
