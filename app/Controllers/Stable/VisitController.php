@@ -61,13 +61,16 @@ class VisitController extends ResourceController
             return $this->respond(['ok'=>false,'error'=>'db_error'], 500);
         }
 
+        $seq = isset($visit['visit_seq']) ? (int)$visit['visit_seq'] : 1;
+        if ($seq < 1) $seq = 1;
+
         return $this->respond([
             'ok'=>true,
             'visit'=>[
                 'id'=>(int)$visit['id'],
                 'uid'=>$uid,
                 'date'=>$today,
-                'sequence'=>(int)$visit['visit_seq'] ?? 1,
+                'sequence'=>$seq,
                 'wasCreated'=>$force
             ]
         ], 200);
@@ -127,6 +130,8 @@ class VisitController extends ResourceController
         $full = $dir . DIRECTORY_SEPARATOR . $name;
 
         $db = \Config\Database::connect();
+
+        // Build the row fully, then trim to existing columns so we don't fail on unknown cols.
         $row = [
             'visit_id'   => $visitId,
             'pet_id'     => (int)$pet['id'],
@@ -138,14 +143,23 @@ class VisitController extends ResourceController
             'created_at' => date('Y-m-d H:i:s'),
         ];
 
+        // Detect existing columns in `documents` and filter the row accordingly
         try {
-            $db->table('documents')->insert($row);
+            $fields = $db->getFieldNames('documents');
         } catch (\Throwable $e) {
-            $fallback = $row;
-            unset($fallback['mime'], $fallback['note']);
+            $fields = array_keys($row); // fallback: try full insert
+        }
+        $filtered = array_intersect_key($row, array_flip($fields));
+
+        try {
+            $db->table('documents')->insert($filtered);
+        } catch (\Throwable $e2) {
+            // As a last resort, keep only the most essential fields
+            $essentials = ['visit_id','type','filename','filesize','created_at'];
+            $filtered2 = array_intersect_key($row, array_flip($essentials));
             try {
-                $db->table('documents')->insert($fallback);
-            } catch (\Throwable $e2) {
+                $db->table('documents')->insert($filtered2);
+            } catch (\Throwable $e3) {
                 return $this->respond(['ok'=>false,'error'=>'db_insert_failed'], 500);
             }
         }
