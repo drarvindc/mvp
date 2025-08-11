@@ -20,6 +20,9 @@ $routes->get('media/selftest', 'MediaController::selftest');
 $routes->get('media/qr-uid', 'MediaController::qrUid');
 $routes->get('media/barcode-uid', 'MediaController::barcodeUid');
 
+$routes->get('admin/tools/migrate-debug', 'Admin\Tools\MigrateDebug::index');
+
+
 // --- Stable API replacing main /api/visit/* ---
 $routes->group('api/visit', ['filter'=>'stableapiauth'], static function($routes) {
     $routes->post('open',   'Stable\VisitController::open');
