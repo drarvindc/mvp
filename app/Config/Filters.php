@@ -11,6 +11,8 @@ class Filters extends BaseConfig
         'adminauth'=> \App\Filters\AdminAuth::class,
 		'apiauth' => \App\Filters\ApiAuthFilter::class,
 		'stableapiauth' => \App\Filters\StableApiAuthFilter::class,
+		'adminauth' => \App\Filters\AdminAuth::class,
+
 
     ];
 

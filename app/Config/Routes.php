@@ -25,6 +25,19 @@ $routes->get('admin/tools/migrate-debug-step', 'Admin\Tools\MigrateDebugStep::in
 $routes->get('tools/visits-admin-view', 'Admin\\Visits::index'); // temporary mirror
 $routes->get('visits-lite', 'VisitsLite::index');
 
+// Login routes (outside adminauth)
+$routes->get('admin/login', 'Admin\Auth\Login::index');
+$routes->post('admin/login', 'Admin\Auth\Login::attempt');
+$routes->get('admin/logout', 'Admin\Auth\Login::logout');
+$routes->get('admin/logout-all', 'Admin\Auth\Login::logoutAll');
+
+// One-time bootstrap to create admin user (keyed)
+$routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
+
+// Protect your admin area with the adminauth filter
+$routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
+    // your admin routes here
+});
 
 
 // --- Stable API replacing main /api/visit/* ---

@@ -1,12 +1,15 @@
-// Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
-// This switches your main API to the Stable implementation that you just tested.
+// Add to app/Config/Routes.php
 
-// --- Stable API replacing main /api/visit/* ---
-$routes->group('api/visit', ['filter'=>'stableapiauth'], static function($routes) {
-    $routes->post('open',   'Stable\VisitController::open');
-    $routes->post('upload', 'Stable\VisitController::upload');
-    $routes->get('today',   'Stable\VisitController::today');
-    $routes->get('by-date', 'Stable\VisitController::byDate');
+// Login routes (outside adminauth)
+$routes->get('admin/login', 'Admin\Auth\Login::index');
+$routes->post('admin/login', 'Admin\Auth\Login::attempt');
+$routes->get('admin/logout', 'Admin\Auth\Login::logout');
+$routes->get('admin/logout-all', 'Admin\Auth\Login::logoutAll');
+
+// One-time bootstrap to create admin user (keyed)
+$routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
+
+// Protect your admin area with the adminauth filter
+$routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
+    // your admin routes here
 });
-
-// Tip: If you still have older /api/visit/* routes defined elsewhere, comment them out so these take precedence.
