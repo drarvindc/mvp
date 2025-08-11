@@ -22,6 +22,7 @@ $routes->get('media/barcode-uid', 'MediaController::barcodeUid');
 
 $routes->get('admin/tools/migrate-debug', 'Admin\Tools\MigrateDebug::index');
 $routes->get('admin/tools/migrate-debug-step', 'Admin\Tools\MigrateDebugStep::index');
+$routes->get('tools/visits-admin-view', 'Admin\\Visits::index'); // temporary mirror
 
 
 // --- Stable API replacing main /api/visit/* ---
