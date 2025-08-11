@@ -21,6 +21,7 @@ $routes->get('media/qr-uid', 'MediaController::qrUid');
 $routes->get('media/barcode-uid', 'MediaController::barcodeUid');
 
 $routes->get('admin/tools/migrate-debug', 'Admin\Tools\MigrateDebug::index');
+$routes->get('admin/tools/migrate-debug-step', 'Admin\Tools\MigrateDebugStep::index');
 
 
 // --- Stable API replacing main /api/visit/* ---
