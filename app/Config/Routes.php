@@ -37,6 +37,7 @@ $routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
 // Protect your admin area with the adminauth filter
 $routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
     // your admin routes here
+	$routes->get('/', 'Admin\Home::index'); // handles GET /admin
 });
 
 

@@ -1,15 +1,5 @@
-// Add to app/Config/Routes.php
-
-// Login routes (outside adminauth)
-$routes->get('admin/login', 'Admin\Auth\Login::index');
-$routes->post('admin/login', 'Admin\Auth\Login::attempt');
-$routes->get('admin/logout', 'Admin\Auth\Login::logout');
-$routes->get('admin/logout-all', 'Admin\Auth\Login::logoutAll');
-
-// One-time bootstrap to create admin user (keyed)
-$routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
-
-// Protect your admin area with the adminauth filter
-$routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
-    // your admin routes here
-});
+// Inside your admin group in app/Config/Routes.php
+// e.g. $routes->group('admin', ['filter' => 'adminauth'], static function($routes) {
+$routes->get('/', 'Admin\Home::index'); // handles GET /admin
+// ...rest of your admin routes...
+// });
