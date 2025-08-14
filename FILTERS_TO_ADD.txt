@@ -1,2 +1,5 @@
-// Add this alias in app/Config/Filters.php under $aliases:
-'adminauth' => \App\Filters\AdminAuth::class,
+// In app/Config/Filters.php add:
+// 'admintoolbar' => \App\Filters\AdminToolbar::class,
+//
+// And apply it to your admin group in Routes.php, e.g.:
+// $routes->group('admin', ['filter' => 'adminauth,admintoolbar'], static function($routes) { ... });

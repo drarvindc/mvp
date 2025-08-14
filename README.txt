@@ -1,9 +1,4 @@
-Admin Landing Fix
-=================
-Purpose: Prevents 404 on GET /admin by redirecting to /admin/tools.
-
-Steps:
-1) Copy app/Controllers/Admin/Home.php into your project.
-2) In app/Config/Routes.php, inside your existing 'admin' group, add:
-   $routes->get('/', 'Admin\Home::index');
-3) Clear cache (writable/cache/*) and retry /index.php/admin after login.
+Adds a small floating admin toolbar with Logout and Tools link without editing views.
+1) Copy app/Filters/AdminToolbar.php
+2) Add alias in app/Config/Filters.php (see FILTERS_TO_ADD.txt)
+3) Add 'admintoolbar' to the admin group's filters.
