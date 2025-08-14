@@ -35,8 +35,7 @@ $routes->get('admin/logout-all', 'Admin\Auth\Login::logoutAll');
 $routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
 
 // Protect your admin area with the adminauth filter
-$routes->group('admin', [adminauth,admintoolbar,dmydate'filter'=>'adminauth,admintoolbar,dmydate    $routes->get('tools', 'Admin\Tools\Home::index');
-'], static function($routes) {
+$routes->group('admin', ['filter' => 'adminauth,admintoolbar,dmydate'], static function($routes) {
     // Admin landing (GET /admin) -> redirect to /admin/tools (which then redirects to migrate)
     $routes->get('/', 'Admin\Home::index');
 
