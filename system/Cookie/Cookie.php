@@ -160,43 +160,28 @@ class Cookie implements ArrayAccess, CloneableCookieInterface
      */
     public static function setDefaults($config = [])
     {
-        $config = $config ?? config('Cookie');
+        $oldDefaults = self::$defaults;
+        $newDefaults = [];
 
-        // Guarded reads: tolerate missing or wrong-typed values
-        $prefix   = isset($config->prefix)   && is_string($config->prefix)   ? $config->prefix   : '';
-        $domain   = isset($config->domain)   && is_string($config->domain)   ? $config->domain   : '';
-        $path     = isset($config->path)     && is_string($config->path)     ? $config->path     : '/';
-        $secure   = isset($config->secure)   ? (bool) $config->secure        : false;
-        $httponly = isset($config->httponly) ? (bool) $config->httponly      : true;
-
-        // Note: your CI core expects lower-case "samesite"; fall back to 'Lax'
-        $sameSite = isset($config->samesite) && is_string($config->samesite) ? $config->samesite : 'Lax';
-
-        // Newer CI has $raw (send cookie values without URL-encoding). Default: false
-        $raw      = isset($config->raw)      ? (bool) $config->raw           : false;
-
-        // Default expiry in seconds (0 = session cookie)
-        $expires  = isset($config->expires)  ? (int) $config->expires        : 0;
-
-        // Validate/normalize
-        $prefix = self::validatePrefix($prefix);
-        $sameSite = self::validateSameSite($sameSite);
-
-        $store = $store
-            ->withPrefix($prefix)
-            ->withDomain($domain)
-            ->withPath($path)
-            ->withSecure($secure)
-            ->withHTTPOnly($httponly)
-            ->withSameSite($sameSite)
-            ->withRaw($raw)
-            ->withExpires($expires);
-    } elseif (is_array($config)) {
+        if ($config instanceof CookieConfig) {
+            // Be tolerant of older/missing properties in Config\Cookie
+            $newDefaults = [
+                'prefix'   => isset($config->prefix)   && is_string($config->prefix)   ? $config->prefix   : $oldDefaults['prefix'],
+                'expires'  => isset($config->expires)  ? (int) $config->expires        : $oldDefaults['expires'],
+                'path'     => isset($config->path)     && is_string($config->path)     ? $config->path     : $oldDefaults['path'],
+                'domain'   => isset($config->domain)   && is_string($config->domain)   ? $config->domain   : $oldDefaults['domain'],
+                'secure'   => isset($config->secure)   ? (bool) $config->secure        : $oldDefaults['secure'],
+                'httponly' => isset($config->httponly) ? (bool) $config->httponly      : $oldDefaults['httponly'],
+                // your core expects lower-case $samesite in Config\Cookie; default Lax
+                'samesite' => isset($config->samesite) && is_string($config->samesite) ? $config->samesite : $oldDefaults['samesite'],
+                // newer builds define $raw; default false if missing
+                'raw'      => isset($config->raw)      ? (bool) $config->raw           : $oldDefaults['raw'],
+            ];
+        } elseif (is_array($config)) {
             $newDefaults = $config;
         }
 
-        // This array union ensures that even if passed `$config` is not
-        // `CookieConfig` or `array`, no empty defaults will occur.
+        // Ensure no empty defaults will occur if an unexpected type is passed
         self::$defaults = $newDefaults + $oldDefaults;
 
         return $oldDefaults;
