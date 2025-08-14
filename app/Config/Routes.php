@@ -36,8 +36,15 @@ $routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
 
 // Protect your admin area with the adminauth filter
 $routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
-    // your admin routes here
-	$routes->get('/', 'Admin\Home::index'); // handles GET /admin
+    // Admin landing (GET /admin) -> redirect to /admin/tools (which then redirects to migrate)
+    $routes->get('/', 'Admin\Home::index');
+
+    // Convenience: /admin/tools -> /admin/tools/migrate
+    $routes->get('tools', static function () {
+        return redirect()->to(site_url('admin/tools/migrate'));
+    });
+
+    // (keep your other admin pages mapped elsewhere or add here as needed)
 });
 
 
@@ -134,18 +141,4 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 
 // Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
 // This switches your main API to the Stable implementation that you just tested.
-
-
-$routes->get('debug/cookie', static function () {
-    $c = config('Cookie');
-    header('Content-Type: text/plain');
-    var_export([
-        'class'     => get_class($c),
-        'has_raw'   => property_exists($c, 'raw'),
-        'raw'       => $c->raw ?? null,
-        'samesite'  => $c->samesite ?? null,
-        'prefix'    => $c->prefix ?? null,
-    ]);
-    exit;
-});
 
