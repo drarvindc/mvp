@@ -1,5 +1,3 @@
-// Add to your Stable API group (where token filter applies)
-// Examples:
-// $routes->group('api/visit', ['filter' => 'stableapiauth'], static function($routes) {
-//     $routes->post('map-orphans', 'Stable\VisitController::mapOrphans'); // new endpoint
-// });
+// Map /admin/tools to a small menu
+// Inside your existing admin group:
+$routes->get('tools', 'Admin\Tools\Home::index'); // replaces the redirect if you had one
