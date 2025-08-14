@@ -57,6 +57,13 @@ class VisitController extends ResourceController
         return iso_to_dmy($s) ?: date('d-m-Y');
     }
 
+    private function toBool($v): bool
+    {
+        if (is_bool($v)) return $v;
+        $s = strtolower((string)$v);
+        return in_array($s, ['1','true','yes','on'], true);
+    }
+
     public function open()
     {
         $uid = trim((string)$this->request->getVar('uid'));
@@ -67,7 +74,7 @@ class VisitController extends ResourceController
         if (!$pet) return $this->respond(['ok'=>false,'error'=>'uid_not_found'], 404);
 
         $force = $this->toBool($this->request->getVar('forceNewVisit'));
-        $iso = date('Y-m-d'); // always create for "today"
+        $iso = date('Y-m-d'); // today
         try {
             $visit = $this->ensureVisit((int)$pet['id'], $iso, $force);
         } catch (\Throwable $e) {
@@ -82,7 +89,7 @@ class VisitController extends ResourceController
             'visit'=>[
                 'id'=>(int)$visit['id'],
                 'uid'=>$uid,
-                'date'=>$this->isoToDmy($iso), // dd-mm-yyyy
+                'date'=>$this->isoToDmy($iso),
                 'sequence'=>$seq,
                 'wasCreated'=>$force
             ]
@@ -143,7 +150,6 @@ class VisitController extends ResourceController
         $full = $dir . DIRECTORY_SEPARATOR . $name;
 
         $db = \Config\Database::connect();
-
         $row = [
             'visit_id'   => $visitId,
             'pet_id'     => (int)$pet['id'],
@@ -163,13 +169,10 @@ class VisitController extends ResourceController
         } catch (\Throwable $e2) {
             $essentials = ['visit_id','type','filename','filesize','created_at'];
             $filtered2 = array_intersect_key($row, array_flip($essentials));
-            try {
-                $db->table('documents')->insert($filtered2);
-            } catch (\Throwable $e3) {
-                return $this->respond(['ok'=>false,'error'=>'db_insert_failed'], 500);
-            }
+            try { $db->table('documents')->insert($filtered2); }
+            catch (\Throwable $e3) { return $this->respond(['ok'=>false,'error'=>'db_insert_failed'], 500); }
         }
-        $docId = (int)$db->insertID();
+        $docId = (int) $db->insertID();
 
         return $this->respond([
             'ok'=>true,
@@ -184,6 +187,33 @@ class VisitController extends ResourceController
         ], 201);
     }
 
+    // Maps any documents with NULL visit_id to today's latest visit for their pet_id
+    public function mapOrphans()
+    {
+        $db = \Config\Database::connect();
+        $today = date('Y-m-d');
+
+        $orphans = $db->table('documents')->where('visit_id', null)->get()->getResultArray();
+        $mapped = 0; $skipped = 0;
+
+        foreach ($orphans as $d) {
+            $petId = (int)($d['pet_id'] ?? 0);
+            if (!$petId) { $skipped++; continue; }
+
+            // ensure visit for today (do not force new so it reuses latest)
+            $visit = $this->ensureVisit($petId, $today, false);
+
+            try {
+                $db->table('documents')->where('id', (int)$d['id'])->update(['visit_id' => (int)$visit['id']]);
+                $mapped++;
+            } catch (\Throwable $e) {
+                $skipped++;
+            }
+        }
+
+        return $this->respond(['ok'=>true,'date'=>$this->isoToDmy($today),'mapped'=>$mapped,'skipped'=>$skipped], 200);
+    }
+
     public function today()
     {
         $uid = trim((string)$this->request->getGet('uid'));
@@ -194,7 +224,6 @@ class VisitController extends ResourceController
         $pet = $this->findPetByUid($uid);
         if (!$pet) return $this->respond(['ok'=>false,'error'=>'uid_not_found'], 404);
 
-        // Accept dd-mm-yyyy or yyyy-mm-dd
         $isoDate = $this->dmyToIso($dateIn);
 
         $db = \Config\Database::connect();
@@ -227,15 +256,5 @@ class VisitController extends ResourceController
         return $this->respond(['ok'=>true,'date'=>$this->isoToDmy($isoDate),'results'=>$out], 200);
     }
 
-    public function byDate()
-    {
-        return $this->today();
-    }
-
-    private function toBool($v): bool
-    {
-        if (is_bool($v)) return $v;
-        $s = strtolower((string)$v);
-        return in_array($s, ['1','true','yes','on'], true);
-    }
+    public function byDate() { return $this->today(); }
 }

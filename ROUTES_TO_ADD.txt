@@ -1,5 +1,5 @@
-// Inside your admin group in app/Config/Routes.php
-// e.g. $routes->group('admin', ['filter' => 'adminauth'], static function($routes) {
-$routes->get('/', 'Admin\Home::index'); // handles GET /admin
-// ...rest of your admin routes...
+// Add to your Stable API group (where token filter applies)
+// Examples:
+// $routes->group('api/visit', ['filter' => 'stableapiauth'], static function($routes) {
+//     $routes->post('map-orphans', 'Stable\VisitController::mapOrphans'); // new endpoint
 // });
