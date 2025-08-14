@@ -2,9 +2,6 @@
 
 namespace Config;
 
-require_once APPPATH . 'Config/Cookie.php';   // force-load app cookie config (has $raw, $samesite, etc.)
-
-
 use CodeIgniter\Config\BaseService;
 
 /**
