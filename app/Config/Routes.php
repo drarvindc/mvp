@@ -35,7 +35,7 @@ $routes->get('admin/logout-all', 'Admin\Auth\Login::logoutAll');
 $routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
 
 // Protect your admin area with the adminauth filter
-$routes->group('admin', ['filter' => 'adminauth,admintoolbar,dmydate'], static function($routes) {
+$routes->group('admin', ['filter' => ['adminauth']], static function($routes) {
     // Admin landing (GET /admin) -> redirect to /admin/tools (which then redirects to migrate)
     $routes->get('/', 'Admin\Home::index');
 
@@ -142,7 +142,3 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 // Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
 // This switches your main API to the Stable implementation that you just tested.
 
-
-$routes->get('admin/login',  'Admin\Auth\Login::index');
-
-$routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
