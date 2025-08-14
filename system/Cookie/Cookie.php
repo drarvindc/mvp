@@ -160,21 +160,38 @@ class Cookie implements ArrayAccess, CloneableCookieInterface
      */
     public static function setDefaults($config = [])
     {
-        $oldDefaults = self::$defaults;
-        $newDefaults = [];
+        $config = $config ?? config('Cookie');
 
-        if ($config instanceof CookieConfig) {
-            $newDefaults = [
-                'prefix'   => $config->prefix,
-                'expires'  => $config->expires,
-                'path'     => $config->path,
-                'domain'   => $config->domain,
-                'secure'   => $config->secure,
-                'httponly' => $config->httponly,
-                'samesite' => $config->samesite,
-                'raw'      => $config->raw,
-            ];
-        } elseif (is_array($config)) {
+        // Guarded reads: tolerate missing or wrong-typed values
+        $prefix   = isset($config->prefix)   && is_string($config->prefix)   ? $config->prefix   : '';
+        $domain   = isset($config->domain)   && is_string($config->domain)   ? $config->domain   : '';
+        $path     = isset($config->path)     && is_string($config->path)     ? $config->path     : '/';
+        $secure   = isset($config->secure)   ? (bool) $config->secure        : false;
+        $httponly = isset($config->httponly) ? (bool) $config->httponly      : true;
+
+        // Note: your CI core expects lower-case "samesite"; fall back to 'Lax'
+        $sameSite = isset($config->samesite) && is_string($config->samesite) ? $config->samesite : 'Lax';
+
+        // Newer CI has $raw (send cookie values without URL-encoding). Default: false
+        $raw      = isset($config->raw)      ? (bool) $config->raw           : false;
+
+        // Default expiry in seconds (0 = session cookie)
+        $expires  = isset($config->expires)  ? (int) $config->expires        : 0;
+
+        // Validate/normalize
+        $prefix = self::validatePrefix($prefix);
+        $sameSite = self::validateSameSite($sameSite);
+
+        $store = $store
+            ->withPrefix($prefix)
+            ->withDomain($domain)
+            ->withPath($path)
+            ->withSecure($secure)
+            ->withHTTPOnly($httponly)
+            ->withSameSite($sameSite)
+            ->withRaw($raw)
+            ->withExpires($expires);
+    } elseif (is_array($config)) {
             $newDefaults = $config;
         }
 
