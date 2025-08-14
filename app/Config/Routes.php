@@ -134,3 +134,17 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 // Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
 // This switches your main API to the Stable implementation that you just tested.
 
+
+$routes->get('debug/cookie', static function () {
+    $c = config('Cookie');
+    header('Content-Type: text/plain');
+    var_export([
+        'class'     => get_class($c),
+        'has_raw'   => property_exists($c, 'raw'),
+        'raw'       => $c->raw ?? null,
+        'samesite'  => $c->samesite ?? null,
+        'prefix'    => $c->prefix ?? null,
+    ]);
+    exit;
+});
+
