@@ -1,5 +1,5 @@
 // In app/Config/Filters.php add:
-// 'admintoolbar' => \App\Filters\AdminToolbar::class,
+// 'dmydate' => \App\Filters\DmyDateFilter::class,
 //
-// And apply it to your admin group in Routes.php, e.g.:
-// $routes->group('admin', ['filter' => 'adminauth,admintoolbar'], static function($routes) { ... });
+// Apply only to admin group in Routes.php:
+// $routes->group('admin', ['filter'=>'adminauth,dmydate'], static function($routes){ ... });

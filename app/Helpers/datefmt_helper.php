@@ -1,5 +1,4 @@
 <?php
-// app/Helpers/datefmt_helper.php
 if (!function_exists('dmy_to_iso')) {
     function dmy_to_iso(?string $s): ?string {
         $s = trim((string)$s);
@@ -8,7 +7,7 @@ if (!function_exists('dmy_to_iso')) {
             return $m[3] . '-' . $m[2] . '-' . $m[1];
         }
         if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $s)) {
-            return $s; // already ISO
+            return $s;
         }
         $ts = strtotime($s);
         return $ts ? date('Y-m-d', $ts) : null;
