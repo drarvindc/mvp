@@ -12,6 +12,8 @@ class Filters extends BaseConfig
 		'apiauth' => \App\Filters\ApiAuthFilter::class,
 		'stableapiauth' => \App\Filters\StableApiAuthFilter::class,
 		'adminauth' => \App\Filters\AdminAuth::class,
+		'devopenaccess' => \App\Filters\DevOpenAccess::class,
+
 
 
     

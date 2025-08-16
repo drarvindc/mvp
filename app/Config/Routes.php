@@ -40,12 +40,15 @@ $routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
     $routes->get('/', 'Admin\Home::index');
 
     // Convenience: /admin/tools -> /admin/tools/migrate
-  $routes->get('tools', 'Admin\Tools\Home::index');
-  $routes->get('tools/migrate', 'Admin\Tools\Migrate::index');
+  $routes->get('tools', 'Admin\Tools\Home::index', ['filter' => 'devopenaccess']);
+
+  $routes->get('tools/migrate', 'Admin\Tools\Migrate::index', ['filter' => 'devopenaccess']);
+
 
     // (keep your other admin pages mapped elsewhere or add here as needed)
     $routes->get('/', 'Admin\Tools\Home::index');
-    $routes->get('tools', 'Admin\Tools\Home::index');
+    $routes->get('tools', 'Admin\Tools\Home::index', ['filter' => 'devopenaccess']);
+
 });
 
 
