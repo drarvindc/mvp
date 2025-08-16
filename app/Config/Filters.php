@@ -12,20 +12,21 @@ class Filters extends BaseConfig
         'invalidchars'  => \CodeIgniter\Filters\InvalidChars::class,
         'secureheaders' => \CodeIgniter\Filters\SecureHeaders::class,
 
-        // Project filters (aliases must be single names, not comma-joined)
+        // Project filters (normal aliases)
         'devopenaccess' => \App\Filters\DevOpenAccess::class,
         'adminauth'     => \App\Filters\AdminAuth::class,
         'admintoolbar'  => \App\Filters\AdminToolbar::class,
         'dmydate'       => \App\Filters\DmyDate::class,
+
+        // 🔧 Hotfix alias to catch the buggy comma-joined value used somewhere:
+        // CI treats the WHOLE string as one alias. Map it to DevOpenAccess so it won't explode.
+        'adminauth,admintoolbar,dmydate' => \App\Filters\DevOpenAccess::class,
     ];
 
-    // Disable global filters during dev to avoid pre-route blocks
+    // During dev, keep globals empty so nothing blocks pre-route
     public array $globals = [
         'before' => [
-            // Example if you want them later:
-            // 'adminauth',
-            // 'admintoolbar',
-            // 'dmydate',
+            // re-enable later as arrays only, e.g. ['adminauth','admintoolbar','dmydate']
         ],
         'after' => [
             // 'toolbar',
@@ -34,7 +35,7 @@ class Filters extends BaseConfig
 
     public array $methods = [];
 
-    // Route-specific filters go here, always as arrays if multiple
+    // Route-specific filters (leave empty for now; use arrays when multiple)
     public array $filters = [
         // 'admin' => ['before' => ['adminauth','admintoolbar','dmydate']],
     ];

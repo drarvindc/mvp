@@ -13,7 +13,7 @@ class DevOpenAccess implements FilterInterface
             return;
         }
 
-        // Ensure an admin session for admin routes
+        // ensure admin session
         $session = session();
         if ($session && ! $session->get('admin_id')) {
             $session->set('admin_id', 1);
@@ -21,7 +21,7 @@ class DevOpenAccess implements FilterInterface
             $session->set('admin_role', 'admin');
         }
 
-        // Inject key/token into CI Request so $this->request->getGet() sees them
+        // inject key/token into CI Request (so getGet() sees them)
         $get = $request->getGet();
         $changed = false;
 
