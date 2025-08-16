@@ -41,12 +41,11 @@ $routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
 
     // Convenience: /admin/tools -> /admin/tools/migrate
   $routes->get('tools', 'Admin\Tools\Home::index');
-
+  $routes->get('tools/migrate', 'Admin\Tools\Migrate::index');
 
     // (keep your other admin pages mapped elsewhere or add here as needed)
     $routes->get('/', 'Admin\Tools\Home::index');
     $routes->get('tools', 'Admin\Tools\Home::index');
-	  $routes->get('tools/migrate', 'Admin\Tools\Migrate::index');
 });
 
 
@@ -150,9 +149,3 @@ $routes->post('api/visit/open', 'Stable\VisitController::open');
 $routes->post('api/visit/upload', 'Stable\VisitController::upload');
 
 $routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
-
-// Apply bypass filter to the testers so admin session skips ?key=...
-$routes->get('tools/api-tester', 'Admin\Tools\ApiTester::index', ['filter' => 'adminbypasskey']);
-$routes->get('tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index', ['filter' => 'adminbypasskey']);
-$routes->get('tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index', ['filter' => 'adminbypasskey']);
-// --- end admin group additions ---

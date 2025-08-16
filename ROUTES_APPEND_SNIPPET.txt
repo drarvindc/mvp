@@ -1,12 +1,11 @@
-// --- inside your existing admin group ---
-$routes->get('tools/migrate', 'Admin\Tools\Migrate::index');
-$routes->get('tools/db-check', 'Admin\Tools\DbCheck::index');
-
-// Apply bypass filter so admin session skips ?key=... on testers
-$routes->get('tools/api-tester', 'Admin\Tools\ApiTester::index', ['filter' => 'adminbypasskey']);
-$routes->get('tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index', ['filter' => 'adminbypasskey']);
-$routes->get('tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index', ['filter' => 'adminbypasskey']);
-
-// --- Filters.php ---
-// Add alias if missing:
-// 'adminbypasskey' => \App\Filters\AdminBypassKey::class,
+// === APPEND-ONLY SNIPPET ===============================================
+// 1) Inside your existing admin group, add:
+//
+// $routes->get('/', 'Admin\Tools\Home::index');
+// $routes->get('tools', 'Admin\Tools\Home::index');
+//
+// 2) Near your other api/visit routes (POST only):
+// $routes->post('api/visit/open', 'Stable\VisitController::open');
+// $routes->post('api/visit/upload', 'Stable\VisitController::upload');
+// $routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
+// ========================================================================
