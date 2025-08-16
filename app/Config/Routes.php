@@ -25,10 +25,6 @@ $routes->get('admin/tools/migrate-debug-step', 'Admin\Tools\MigrateDebugStep::in
 $routes->get('tools/visits-admin-view', 'Admin\\Visits::index'); // temporary mirror
 $routes->get('visits-lite', 'VisitsLite::index');
 
-$routes->get('tools/migrate', 'Admin\Tools\Migrate::index', ['filter' => 'devopenaccess']);
-$routes->get('tools/db-check', 'Admin\Tools\DbCheck::index', ['filter' => 'devopenaccess']);
-
-
 // Login routes (outside adminauth)
 $routes->get('admin/login', 'Admin\Auth\Login::index');
 $routes->post('admin/login', 'Admin\Auth\Login::attempt');

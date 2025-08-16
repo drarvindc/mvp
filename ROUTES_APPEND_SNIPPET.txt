@@ -1,3 +1,11 @@
-// Add inside your existing admin group (append-only):
-$routes->get('tools/migrate', 'Admin\Tools\Migrate::index', ['filter' => 'devopenaccess']);
-$routes->get('tools/db-check', 'Admin\Tools\DbCheck::index', ['filter' => 'devopenaccess']);
+// === APPEND-ONLY SNIPPET ===============================================
+// 1) Inside your existing admin group, add:
+//
+// $routes->get('/', 'Admin\Tools\Home::index');
+// $routes->get('tools', 'Admin\Tools\Home::index');
+//
+// 2) Near your other api/visit routes (POST only):
+// $routes->post('api/visit/open', 'Stable\VisitController::open');
+// $routes->post('api/visit/upload', 'Stable\VisitController::upload');
+// $routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
+// ========================================================================
