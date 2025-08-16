@@ -1,0 +1,14 @@
+<?php
+$routes->addRedirect('admin', 'admin/tools', 302);
+$routes->get('admin/tools', 'Admin\Tools\Menu::index', ['filter' => 'devopenaccess']);
+
+$routes->group('admin/tools', ['filter' => 'devopenaccess'], static function($routes) {
+    $routes->get('api-tester', 'Admin\Tools\ApiTester::index');
+    $routes->get('api-tester-android', 'Admin\Tools\ApiTesterAndroid::index');
+    $routes->get('api-tester-classic', 'Admin\Tools\ApiTesterClassic::index');
+    $routes->get('stable-api-tester', 'Admin\Tools\StableApiTester::index');
+    $routes->get('migrate', 'Admin\Tools\MigrateDebug::index');
+    $routes->get('migrate-debug', 'Admin\Tools\MigrateDebug::index');
+    $routes->get('migrate-debug-step', 'Admin\Tools\MigrateDebugStep::index');
+    $routes->get('db-check', 'Admin\Tools\DbCheck::index');
+});

@@ -24,14 +24,7 @@ class Filters extends BaseConfig
     ];
 
     // During dev, keep globals empty so nothing blocks pre-route
-    public array $globals = [
-        'before' => [
-            // re-enable later as arrays only, e.g. ['adminauth','admintoolbar','dmydate']
-        ],
-        'after' => [
-            // 'toolbar',
-        ],
-    ];
+    public array $globals = [ 'before' => [], 'after' => [], ];
 
     public array $methods = [];
 

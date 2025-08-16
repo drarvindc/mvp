@@ -36,15 +36,14 @@ $routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
 
 // Protect your admin area with the adminauth filter
 $routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
-    // Admin landing (GET /admin) -> redirect to /admin/tools (which then redirects to migrate)
-    $routes->get('/', 'Admin\Tools\Home::index');
 
-    // Convenience: /admin/tools -> /admin/tools/migrate
-    $routes->get('tools', 'Admin\Tools\Home::index');
+$routes->get('tools/api-tester', 'Admin\Tools\ApiTester::index', ['filter' => 'devopenaccess']);
+$routes->get('tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index', ['filter' => 'devopenaccess']);
+$routes->get('tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index', ['filter' => 'devopenaccess']);
+$routes->get('tools/stable-api-tester', 'Admin\Tools\StableApiTester::index', ['filter' => 'devopenaccess']);
+$routes->get('tools/db-check', 'Admin\Tools\DbCheck::index', ['filter' => 'devopenaccess']);
 
-    // (keep your other admin pages mapped elsewhere or add here as needed)
-    $routes->get('/', 'Admin\Tools\Home::index');
-    $routes->get('tools', 'Admin\Tools\Home::index');
+    // your admin routes here
 });
 
 
@@ -142,20 +141,3 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 // Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
 // This switches your main API to the Stable implementation that you just tested.
 
-
-$routes->post('api/visit/open', 'Stable\VisitController::open');
-
-$routes->post('api/visit/upload', 'Stable\VisitController::upload');
-
-$routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
-
-
-// ========= APPEND-ONLY: Ensure testers run with dev-bypass; add DbCheck =========
-$routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index', ['filter' => 'devopenaccess']);
-$routes->get('admin/tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index', ['filter' => 'devopenaccess']);
-
-// If you also want the general tester landed explicitly:
-$routes->get('admin/tools/api-tester', 'Admin\Tools\ApiTester::index', ['filter' => 'devopenaccess']);
-
-// DbCheck (read-only status page)
-$routes->get('admin/tools/db-check', 'Admin\Tools\DbCheck::index', ['filter' => 'devopenaccess']);
