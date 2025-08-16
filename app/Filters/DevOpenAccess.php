@@ -9,25 +9,36 @@ class DevOpenAccess implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        // Toggle via .env -> DEV_NO_AUTH=true
-        $dev = env('DEV_NO_AUTH', false);
-        if (! $dev) {
+        if (! env('DEV_NO_AUTH', false)) {
             return;
         }
 
-        // 1) Ensure admin session so admin pages render without login
+        // Ensure an admin session for admin routes
         $session = session();
         if ($session && ! $session->get('admin_id')) {
-            $session->set('admin_id', 2);      // Use any valid admin user id
+            $session->set('admin_id', 1);
             $session->set('admin_name', 'Dev Mode');
             $session->set('admin_role', 'admin');
         }
 
-        // 2) Auto-inject API token for tester/API calls if not provided
-        $token = env('ANDROID_API_TOKEN');
-        if ($token && empty($_GET['token']) && empty($_REQUEST['token'])) {
-            $_GET['token'] = $token;
-            $_REQUEST['token'] = $token;
+        // Inject key/token into CI Request so $this->request->getGet() sees them
+        $get = $request->getGet();
+        $changed = false;
+
+        $webKey = env('MIGRATE_WEB_KEY');
+        if ($webKey && empty($get['key'])) {
+            $get['key'] = $webKey;
+            $changed = true;
+        }
+
+        $apiToken = env('ANDROID_API_TOKEN');
+        if ($apiToken && empty($get['token'])) {
+            $get['token'] = $apiToken;
+            $changed = true;
+        }
+
+        if ($changed) {
+            $request->setGlobal('get', $get);
         }
     }
 

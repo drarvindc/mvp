@@ -9,11 +9,10 @@ class AdminAuth implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        // In dev bypass mode, do nothing (let request through).
         if (env('DEV_NO_AUTH', false)) {
-            return;
+            return; // allow through in dev
         }
-        // Production behavior (no-op placeholder). Replace with real logic later.
+        // production logic can be added later
         return;
     }
 

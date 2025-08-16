@@ -148,3 +148,32 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 $routes->get('admin/login',  'Admin\Auth\Login::index');
 
 $routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
+
+
+<?php
+// ===============================
+// APPEND-ONLY: Admin tool routes — uses dev bypass in dev
+// ===============================
+$routes->get('admin', 'Admin\\Tools\\Home::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/tools', 'Admin\\Tools\\Home::index', ['filter' => 'devopenaccess']);
+
+$routes->get('admin/tools/migrate', 'Admin\\Tools\\MigrateDebug::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/tools/migrate-debug', 'Admin\\Tools\\MigrateDebug::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/tools/migrate-debug-step', 'Admin\\Tools\\MigrateDebugStep::index', ['filter' => 'devopenaccess']);
+
+$routes->get('admin/tools/api-tester', 'Admin\\Tools\\ApiTester::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/tools/api-tester-android', 'Admin\\Tools\\ApiTesterAndroid::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/tools/api-tester-classic', 'Admin\\Tools\\ApiTesterClassic::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/tools/stable-api-tester', 'Admin\\Tools\\StableApiTester::index', ['filter' => 'devopenaccess']);
+
+// Optional: only if you later add DbCheck controller
+// $routes->get('admin/tools/db-check', 'Admin\\Tools\\DbCheck::index', ['filter' => 'devopenaccess']);
+
+// ===============================
+// APPEND-ONLY: API — dev bypass injects token
+// ===============================
+$routes->group('api/visit', ['filter' => 'devopenaccess'], static function($routes) {
+    $routes->post('open', 'Api\\VisitController::open');
+    $routes->post('upload', 'Api\\VisitController::upload');
+    $routes->post('map-orphans', 'Api\\VisitController::mapOrphans');
+});

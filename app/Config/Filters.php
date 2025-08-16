@@ -1,34 +1,36 @@
-<?php namespace Config;
+<?php
+namespace Config;
 
 use CodeIgniter\Config\BaseConfig;
 
 class Filters extends BaseConfig
 {
-    public $aliases = [
-        'dmydate' => \App\Filters\DmyDate::class,
-        'admintoolbar' => \App\Filters\AdminToolbar::class,
+    public array $aliases = [
+        'toolbar'       => \CodeIgniter\Filters\DebugToolbar::class,
+        'honeypot'      => \CodeIgniter\Filters\Honeypot::class,
+        'invalidchars'  => \CodeIgniter\Filters\InvalidChars::class,
+        'secureheaders' => \CodeIgniter\Filters\SecureHeaders::class,
+
+        // Project filters
         'devopenaccess' => \App\Filters\DevOpenAccess::class,
-        'csrf'     => \CodeIgniter\Filters\CSRF::class,
-        'toolbar'  => \CodeIgniter\Filters\DebugToolbar::class,
-        'honeypot' => \CodeIgniter\Filters\Honeypot::class,
-        'adminauth'=> \App\Filters\AdminAuth::class,
-		'apiauth' => \App\Filters\ApiAuthFilter::class,
-		'stableapiauth' => \App\Filters\StableApiAuthFilter::class,
-		'adminauth' => \App\Filters\AdminAuth::class,
-
-
+        'adminauth'     => \App\Filters\AdminAuth::class,
+        'admintoolbar'  => \App\Filters\AdminToolbar::class,
+        'dmydate'       => \App\Filters\DmyDate::class,
     ];
 
-    public $globals = [
+    // Fastest unblock: disable global before/after filters in dev
+    public array $globals = [
         'before' => [
-            // 'csrf',
+            // leave empty during DEV_NO_AUTH to avoid pre-route blocks
         ],
-        'after'  => [
-            'toolbar',
+        'after' => [
+            // 'toolbar',
         ],
     ];
 
-    public $methods = [];
-    public $filters = [];
-}
+    public array $methods = [];
 
+    public array $filters = [
+        // keep route-specific filters only
+    ];
+}
