@@ -35,7 +35,7 @@ $routes->get('admin/logout-all', 'Admin\Auth\Login::logoutAll');
 $routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
 
 // Protect your admin area with the adminauth filter
-$routes->group('admin', ['filter' => ['adminauth']], static function($routes) {
+$routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
     // Admin landing (GET /admin) -> redirect to /admin/tools (which then redirects to migrate)
     $routes->get('/', 'Admin\Home::index');
 
@@ -45,6 +45,8 @@ $routes->group('admin', ['filter' => ['adminauth']], static function($routes) {
     });
 
     // (keep your other admin pages mapped elsewhere or add here as needed)
+    $routes->get('/', 'Admin\Tools\Home::index');
+    $routes->get('tools', 'Admin\Tools\Home::index');
 });
 
 
@@ -128,7 +130,6 @@ $routes->get('patient/provisional', 'PatientController::provisional');
     $routes->get('db-status', 'Admin\DbStatusController::index');
 	
 	
-	
 });
 
 // Optional diagnostics (remove after testing)
@@ -142,3 +143,10 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 
 // Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
 // This switches your main API to the Stable implementation that you just tested.
+
+
+$routes->post('api/visit/open', 'Stable\VisitController::open');
+
+$routes->post('api/visit/upload', 'Stable\VisitController::upload');
+
+$routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
