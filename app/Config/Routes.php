@@ -148,3 +148,14 @@ $routes->post('api/visit/open', 'Stable\VisitController::open');
 $routes->post('api/visit/upload', 'Stable\VisitController::upload');
 
 $routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
+
+
+// ========= APPEND-ONLY: Ensure testers run with dev-bypass; add DbCheck =========
+$routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index', ['filter' => 'devopenaccess']);
+
+// If you also want the general tester landed explicitly:
+$routes->get('admin/tools/api-tester', 'Admin\Tools\ApiTester::index', ['filter' => 'devopenaccess']);
+
+// DbCheck (read-only status page)
+$routes->get('admin/tools/db-check', 'Admin\Tools\DbCheck::index', ['filter' => 'devopenaccess']);
