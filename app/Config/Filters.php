@@ -5,6 +5,7 @@ use CodeIgniter\Config\BaseConfig;
 class Filters extends BaseConfig
 {
     public $aliases = [
+        'devopenaccess' => \App\Filters\DevOpenAccess::class,
         'csrf'     => \CodeIgniter\Filters\CSRF::class,
         'toolbar'  => \CodeIgniter\Filters\DebugToolbar::class,
         'honeypot' => \CodeIgniter\Filters\Honeypot::class,
@@ -12,8 +13,6 @@ class Filters extends BaseConfig
 		'apiauth' => \App\Filters\ApiAuthFilter::class,
 		'stableapiauth' => \App\Filters\StableApiAuthFilter::class,
 		'adminauth' => \App\Filters\AdminAuth::class,
-		'devopenaccess' => \App\Filters\DevOpenAccess::class,
-
 
 
     

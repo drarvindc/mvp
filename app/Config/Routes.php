@@ -1,4 +1,7 @@
 <?php
+// === PUBLIC (no auth) ===
+// patient/intake, visits-lite
+
 
 use CodeIgniter\Router\RouteCollection;
 
@@ -36,19 +39,17 @@ $routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
 
 // Protect your admin area with the adminauth filter
 $routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
+        // === ADMIN (dev bypass applied via 'devopenaccess') ===
+
     // Admin landing (GET /admin) -> redirect to /admin/tools (which then redirects to migrate)
     $routes->get('/', 'Admin\Home::index');
 
     // Convenience: /admin/tools -> /admin/tools/migrate
-  $routes->get('tools', 'Admin\Tools\Home::index', ['filter' => 'devopenaccess']);
-
-  $routes->get('tools/migrate', 'Admin\Tools\Migrate::index', ['filter' => 'devopenaccess']);
-
-
+  $routes->get('tools', 'Admin\Tools\Home::index', ['filter' => 'devopenaccess']);  $routes->get('tools/migrate', 'Admin\Tools\Migrate::index', ['filter' => 'devopenaccess']);
     // (keep your other admin pages mapped elsewhere or add here as needed)
     $routes->get('/', 'Admin\Tools\Home::index');
-    $routes->get('tools', 'Admin\Tools\Home::index', ['filter' => 'devopenaccess']);
-
+    $routes->get('tools', 'Admin\Tools\Home::index', ['filter' => 'devopenaccess']);	
+	
 });
 
 
