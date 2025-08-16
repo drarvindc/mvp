@@ -5,7 +5,7 @@ use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class AdminAuth implements FilterInterface
+class DmyDate implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {

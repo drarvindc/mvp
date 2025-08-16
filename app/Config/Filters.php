@@ -5,6 +5,8 @@ use CodeIgniter\Config\BaseConfig;
 class Filters extends BaseConfig
 {
     public $aliases = [
+        'dmydate' => \App\Filters\DmyDate::class,
+        'admintoolbar' => \App\Filters\AdminToolbar::class,
         'devopenaccess' => \App\Filters\DevOpenAccess::class,
         'csrf'     => \CodeIgniter\Filters\CSRF::class,
         'toolbar'  => \CodeIgniter\Filters\DebugToolbar::class,
@@ -15,9 +17,7 @@ class Filters extends BaseConfig
 		'adminauth' => \App\Filters\AdminAuth::class,
 
 
-    
-        'admintoolbar' => \App\Filters\AdminToolbar::class,
-        'dmydate' => \App\Filters\DmyDateFilter::class,];
+    ];
 
     public $globals = [
         'before' => [
