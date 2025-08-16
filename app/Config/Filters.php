@@ -12,26 +12,30 @@ class Filters extends BaseConfig
         'invalidchars'  => \CodeIgniter\Filters\InvalidChars::class,
         'secureheaders' => \CodeIgniter\Filters\SecureHeaders::class,
 
-        // Project filters
+        // Project filters (aliases must be single names, not comma-joined)
         'devopenaccess' => \App\Filters\DevOpenAccess::class,
         'adminauth'     => \App\Filters\AdminAuth::class,
         'admintoolbar'  => \App\Filters\AdminToolbar::class,
         'dmydate'       => \App\Filters\DmyDate::class,
     ];
 
-    // Fastest unblock during dev — empty globals so nothing blocks pre-route
+    // Disable global filters during dev to avoid pre-route blocks
     public array $globals = [
         'before' => [
-            // keep empty in dev to avoid pre-route blocks
+            // Example if you want them later:
+            // 'adminauth',
+            // 'admintoolbar',
+            // 'dmydate',
         ],
         'after' => [
-            // 'toolbar', // enable if you want CI toolbar
+            // 'toolbar',
         ],
     ];
 
     public array $methods = [];
 
+    // Route-specific filters go here, always as arrays if multiple
     public array $filters = [
-        // keep route-specific filters only
+        // 'admin' => ['before' => ['adminauth','admintoolbar','dmydate']],
     ];
 }
