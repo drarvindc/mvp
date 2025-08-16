@@ -6,6 +6,7 @@ use CodeIgniter\Config\BaseConfig;
 class Filters extends BaseConfig
 {
     public array $aliases = [
+        // CI built-ins
         'toolbar'       => \CodeIgniter\Filters\DebugToolbar::class,
         'honeypot'      => \CodeIgniter\Filters\Honeypot::class,
         'invalidchars'  => \CodeIgniter\Filters\InvalidChars::class,
@@ -18,13 +19,13 @@ class Filters extends BaseConfig
         'dmydate'       => \App\Filters\DmyDate::class,
     ];
 
-    // Fastest unblock: disable global before/after filters in dev
+    // Fastest unblock during dev — empty globals so nothing blocks pre-route
     public array $globals = [
         'before' => [
-            // leave empty during DEV_NO_AUTH to avoid pre-route blocks
+            // keep empty in dev to avoid pre-route blocks
         ],
         'after' => [
-            // 'toolbar',
+            // 'toolbar', // enable if you want CI toolbar
         ],
     ];
 

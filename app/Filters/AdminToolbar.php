@@ -9,10 +9,11 @@ class AdminToolbar implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
+        // In dev, allow everything through
         if (env('DEV_NO_AUTH', false)) {
-            return; // allow through in dev
+            return;
         }
-        // production logic can be added later
+        // TODO: implement real logic in prod later
         return;
     }
 

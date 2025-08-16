@@ -14,8 +14,7 @@ $routes->get('admin/tools/api-tester-android', 'Admin\\Tools\\ApiTesterAndroid::
 $routes->get('admin/tools/api-tester-classic', 'Admin\\Tools\\ApiTesterClassic::index', ['filter' => 'devopenaccess']);
 $routes->get('admin/tools/stable-api-tester', 'Admin\\Tools\\StableApiTester::index', ['filter' => 'devopenaccess']);
 
-// Optional: only if you later add DbCheck controller
-// $routes->get('admin/tools/db-check', 'Admin\\Tools\\DbCheck::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/tools/db-check', 'Admin\\Tools\\DbCheck::index', ['filter' => 'devopenaccess']);
 
 // ===============================
 // APPEND-ONLY: API — dev bypass injects token
