@@ -40,9 +40,8 @@ $routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
     $routes->get('/', 'Admin\Home::index');
 
     // Convenience: /admin/tools -> /admin/tools/migrate
-    $routes->get('tools', static function () {
-        return redirect()->to(site_url('admin/tools/migrate'));
-    });
+  $routes->get('tools', 'Admin\Tools\Home::index');
+  $routes->get('tools/migrate', 'Admin\Tools\Migrate::index');
 
     // (keep your other admin pages mapped elsewhere or add here as needed)
     $routes->get('/', 'Admin\Tools\Home::index');
