@@ -150,7 +150,6 @@ $routes->get('admin/login',  'Admin\Auth\Login::index');
 $routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
 
 
-<?php
 // ===============================
 // APPEND-ONLY: Admin tool routes — uses dev bypass in dev
 // ===============================
