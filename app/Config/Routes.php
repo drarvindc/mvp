@@ -1,6 +1,5 @@
 <?php
-// === PUBLIC (no auth) ===
-// patient/intake, visits-lite
+// PUBLIC (no auth): patient/intake, visits-lite, tools/visits-admin-view
 
 
 use CodeIgniter\Router\RouteCollection;
@@ -38,18 +37,16 @@ $routes->get('admin/logout-all', 'Admin\Auth\Login::logoutAll');
 $routes->get('admin/tools/make-admin', 'Admin\Tools\MakeAdmin::index');
 
 // Protect your admin area with the adminauth filter
-$routes->group('admin', ['filter'=>'adminauth'], static function($routes) {
-        // === ADMIN (dev bypass applied via 'devopenaccess') ===
-
+$routes->group('admin', ['filter'=>'adminauth,admintoolbar,dmydate'], static function($routes) {
     // Admin landing (GET /admin) -> redirect to /admin/tools (which then redirects to migrate)
     $routes->get('/', 'Admin\Home::index');
 
     // Convenience: /admin/tools -> /admin/tools/migrate
-  $routes->get('tools', 'Admin\Tools\Home::index', ['filter' => 'devopenaccess']);  $routes->get('tools/migrate', 'Admin\Tools\Migrate::index', ['filter' => 'devopenaccess']);
+    $routes->get('tools', static function () {
+        return redirect()->to(site_url('admin/tools/migrate'));
+    });
+
     // (keep your other admin pages mapped elsewhere or add here as needed)
-    $routes->get('/', 'Admin\Tools\Home::index');
-    $routes->get('tools', 'Admin\Tools\Home::index', ['filter' => 'devopenaccess']);	
-	
 });
 
 
@@ -148,8 +145,6 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 // This switches your main API to the Stable implementation that you just tested.
 
 
-$routes->post('api/visit/open', 'Stable\VisitController::open');
-
-$routes->post('api/visit/upload', 'Stable\VisitController::upload');
+$routes->get('admin/login',  'Admin\Auth\Login::index');
 
 $routes->post('api/visit/map-orphans', 'Stable\VisitController::mapOrphans');
