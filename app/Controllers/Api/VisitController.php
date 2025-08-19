@@ -6,7 +6,6 @@ namespace App\Controllers\Api;
 use App\Controllers\BaseController;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\HTTP\ResponseInterface;
-use CodeIgniter\Exceptions\PageNotFoundException;
 
 /**
  * Visits API
@@ -14,7 +13,8 @@ use CodeIgniter\Exceptions\PageNotFoundException;
  * Endpoints:
  *  - POST /api/visit/open            uid=250001 [&forceNewVisit=1]
  *  - GET  /api/visit/by-date         token=&uid=&date=dd-mm-yyyy|yyyy-mm-dd [&all=1]
- *  - POST /api/visit/upload          token=&uid=&type=rx|photo|doc|xray|lab|usg|invoice&file=@...
+ *  - POST /api/visit/upload          token=&uid=&type=rx|photo|doc|xray|lab|usg|invoice&file=@... [&note=...]
+ *                                    (multi: file[] or files[], optional note[] to match order)
  *  - POST /api/visit/map-orphans     token=[&uid=250001]
  *
  * Auth:
@@ -25,12 +25,6 @@ class VisitController extends BaseController
 {
     // ---------- PUBLIC ENDPOINTS ----------
 
-    /**
-     * POST /api/visit/open
-     * Body: uid=250001 [&forceNewVisit=1]
-     * Response:
-     *  { ok:true, visit:{ id, uid, date:"dd-mm-yyyy", sequence:<int>, wasCreated:<bool> } }
-     */
     public function open(): ResponseInterface
     {
         if (! $this->authOk()) {
@@ -57,7 +51,6 @@ class VisitController extends BaseController
             $id  = $this->createVisit($petId, $today, $seq, $db);
             $wasCreated = true;
         } else {
-            // try latest existing today
             $row = $db->query(
                 "SELECT id, visit_seq FROM visits WHERE pet_id=? AND visit_date=? ORDER BY visit_seq DESC LIMIT 1",
                 [$petId, $today]
@@ -86,11 +79,6 @@ class VisitController extends BaseController
         ]);
     }
 
-    /**
-     * GET /api/visit/by-date?token=&uid=&date=dd-mm-yyyy|yyyy-mm-dd[&all=1]
-     * Response:
-     *  { ok:true, date:"dd-mm-yyyy", results:[ {id,date,sequence,documents:[...]}, ... ] }
-     */
     public function byDate(): ResponseInterface
     {
         if (! $this->authOk()) {
@@ -116,7 +104,7 @@ class VisitController extends BaseController
         $db    = db_connect();
         $petId = $this->petIdFromUid($uid, $db);
         if (! $petId) {
-            return $this->json(['ok' => true, 'date' => $this->isoToDmy($iso), 'results' => []]); // silent empty
+            return $this->json(['ok' => true, 'date' => $this->isoToDmy($iso), 'results' => []]);
         }
 
         $visits = $this->fetchVisitsWithDocs($petId, $iso, $all === 1, $db);
@@ -129,9 +117,12 @@ class VisitController extends BaseController
     }
 
     /**
-     * POST /api/visit/upload
-     * Enforces type and generates collision-safe filenames.
-     * Response aligns with your testers.
+     * Enhanced: supports single file (legacy) and multiple files in one request.
+     * - Single: returns { ok, visitId, attachment: {...} }
+     * - Multi:  returns { ok, visitId, attachments: [ {...}, {...} ] }
+     * Notes:
+     * - `note` can be a single string or note[] matching file order.
+     * - Accepts file in any of: 'file' (single), 'file[]', or 'files[]'.
      */
     public function upload(): ResponseInterface
     {
@@ -141,104 +132,138 @@ class VisitController extends BaseController
 
         $uid   = trim((string) ($this->request->getPost('uid') ?? ''));
         $type  = strtolower(trim((string) ($this->request->getPost('type') ?? '')));
-        $note  = trim((string) ($this->request->getPost('note') ?? ''));
+        $note  = $this->request->getPost('note'); // can be string or array
         $file  = $this->request->getFile('file');
 
         if ($uid === '' || strlen($uid) !== 6) {
             return $this->json(['ok' => false, 'error' => 'uid_invalid'], 422);
         }
-        if (! $file || ! $file->isValid()) {
-            return $this->json(['ok' => false, 'error' => 'file_missing_or_invalid'], 422);
-        }
 
-        // type required + allowlist
         $allowed = ['rx','photo','doc','xray','lab','usg','invoice'];
         if ($type === '' || ! in_array($type, $allowed, true)) {
             return $this->json(['ok' => false, 'error' => 'type_invalid', 'allowed' => $allowed], 422);
         }
-        // Map "rx" to DB enum if needed
         $typeDb = ($type === 'rx') ? 'prescription' : $type;
 
         $db    = db_connect();
-        $petId = $this->petIdFromUid($uid, $db); // may be null; we’ll still accept upload
+        $petId = $this->petIdFromUid($uid, $db); // may be null; we still accept upload
 
-        // Build filename: ddmmyy-type-uid-XX.ext
-        $ddmmyy  = date('dmy');
-        $seq     = $this->nextSequenceForDay($uid, $ddmmyy, $db);
-        $ext     = strtolower($file->getClientExtension() ?: pathinfo($file->getName(), PATHINFO_EXTENSION) ?: 'bin');
-        $stem    = sprintf('%s-%s-%s-%02d', $ddmmyy, $type, $uid, $seq);
-        $final   = $this->uniqueFilename($stem, $ext, $db);
-
-        // Target location (writable/uploads)
-        $targetDir  = rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads';
-        @is_dir($targetDir) || @mkdir($targetDir, 0775, true);
-        $targetPath = $targetDir . DIRECTORY_SEPARATOR . $final;
-
-        try {
-            $file->move($targetDir, $final, true);
-        } catch (\Throwable $e) {
-            return $this->json(['ok' => false, 'error' => 'file_move_failed', 'detail' => $e->getMessage()], 500);
+        // Collect files: single or multiple
+        $files = [];
+        if ($file && $file->isValid()) {
+            $files = [$file]; // legacy single
+        } else {
+            // try file[] then files[]
+            $files = $this->request->getFileMultiple('file');
+            if (empty($files)) {
+                $files = $this->request->getFileMultiple('files');
+            }
         }
 
-        // Optionally map to today's visit
+        if (empty($files)) {
+            return $this->json(['ok' => false, 'error' => 'file_missing_or_invalid'], 422);
+        }
+
+        // Normalize notes to array aligned with $files
+        $notes = [];
+        if (is_array($note)) {
+            $notes = array_values($note);
+        } elseif (is_string($note) && $note !== '') {
+            $notes = array_fill(0, count($files), $note);
+        } else {
+            $notes = array_fill(0, count($files), null);
+        }
+
+        // Prepare visit mapping (best effort)
         $visitId = null;
         try {
             if ($petId) {
-                $visitId = $this->ensureVisitForToday($petId, db: $db); // returns integer id
+                $visitId = $this->ensureVisitForToday($petId, db: $db);
             }
         } catch (\Throwable $e) {
-            $visitId = null; // keep silent, allow orphan
+            $visitId = null;
         }
 
-        // Insert into documents
-        $mime = (string) ($file->getMimeType() ?: '');
-        $size = (int) ($file->getSize() ?: 0);
-        $now  = date('Y-m-d H:i:s');
+        $ddmmyy    = date('dmy');
+        $targetDir = rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads';
+        @is_dir($targetDir) || @mkdir($targetDir, 0775, true);
 
-        $doc = [
-            'patient_unique_id' => $uid,
-            'pet_id'            => $petId,
-            'visit_id'          => $visitId,
-            'type'              => $typeDb,
-            'subtype'           => null,
-            'path'              => 'writable/uploads/' . $final, // viewer resolves across roots
-            'filename'          => $final,
-            'source'            => 'web',
-            'ref_id'            => null,
-            'seq'               => null,
-            'mime'              => $mime ?: null,
-            'size_bytes'        => $size ?: null,
-            'captured_at'       => $now,
-            'checksum_sha1'     => sha1_file($targetPath),
-            'created_at'        => $now,
-            'note'              => $note ?: null,
-        ];
+        $attachments = [];
+        foreach ($files as $i => $f) {
+            if (! $f || ! $f->isValid()) {
+                $attachments[] = ['error' => 'file_invalid'];
+                continue;
+            }
 
-        try {
-            $db->table('documents')->insert($doc);
-            $docId = (int) $db->insertID();
-        } catch (\Throwable $e) {
-            @unlink($targetPath);
-            return $this->json(['ok' => false, 'error' => 'db_insert_failed', 'detail' => $e->getMessage()], 500);
+            $seq   = $this->nextSequenceForDay($uid, $ddmmyy, $db);
+            $ext   = strtolower($f->getClientExtension() ?: pathinfo($f->getName(), PATHINFO_EXTENSION) ?: 'bin');
+            $stem  = sprintf('%s-%s-%s-%02d', $ddmmyy, $type, $uid, $seq);
+            $final = $this->uniqueFilename($stem, $ext, $db);
+
+            $targetPath = $targetDir . DIRECTORY_SEPARATOR . $final;
+            try {
+                $f->move($targetDir, $final, true);
+            } catch (\Throwable $e) {
+                $attachments[] = ['error' => 'file_move_failed', 'detail' => $e->getMessage()];
+                continue;
+            }
+
+            $mime = (string) ($f->getMimeType() ?: '');
+            $size = (int) ($f->getSize() ?: 0);
+            $now  = date('Y-m-d H:i:s');
+
+            $doc = [
+                'patient_unique_id' => $uid,
+                'pet_id'            => $petId,
+                'visit_id'          => $visitId,
+                'type'              => $typeDb,
+                'subtype'           => null,
+                'path'              => 'writable/uploads/' . $final,
+                'filename'          => $final,
+                'source'            => 'web',
+                'ref_id'            => null,
+                'seq'               => null,
+                'mime'              => $mime ?: null,
+                'size_bytes'        => $size ?: null,
+                'captured_at'       => $now,
+                'checksum_sha1'     => sha1_file($targetPath),
+                'created_at'        => $now,
+                'note'              => $notes[$i] ?? null,
+            ];
+
+            try {
+                $db->table('documents')->insert($doc);
+                $docId = (int) $db->insertID();
+                $attachments[] = [
+                    'id'         => $docId,
+                    'type'       => $type,
+                    'filename'   => $final,
+                    'url'        => site_url('admin/visit/file?id=' . $docId),
+                    'created_at' => $now,
+                ];
+            } catch (\Throwable $e) {
+                @unlink($targetPath);
+                $attachments[] = ['error' => 'db_insert_failed', 'detail' => $e->getMessage()];
+            }
         }
 
+        // Keep legacy response for single-file calls
+        if (count($attachments) === 1 && isset($attachments[0]['id'])) {
+            return $this->json([
+                'ok'        => true,
+                'visitId'   => $visitId,
+                'attachment'=> $attachments[0],
+            ]);
+        }
+
+        // Multi-file (or single with error)
         return $this->json([
-            'ok'       => true,
-            'visitId'  => $visitId,
-            'attachment' => [
-                'id'         => $docId,
-                'type'       => $type,
-                'filename'   => $final,
-                'url'        => site_url('admin/visit/file?id=' . $docId),
-                'created_at' => $now,
-            ],
+            'ok'          => true,
+            'visitId'     => $visitId,
+            'attachments' => $attachments,
         ]);
     }
 
-    /**
-     * POST /api/visit/map-orphans[?token=...] [&uid=250001]
-     * Maps orphan docs (visit_id NULL) to today's visit for their UID.
-     */
     public function mapOrphans(): ResponseInterface
     {
         if (! $this->authOk()) {
@@ -289,9 +314,7 @@ class VisitController extends BaseController
     private function authOk(): bool
     {
         $devBypass = env('DEV_NO_AUTH', false);
-        if ($devBypass) {
-            return true;
-        }
+        if ($devBypass) return true;
         $token = $this->request->getGet('token') ?? $this->request->getPost('token');
         $expected = env('ANDROID_API_TOKEN', '');
         return $expected === '' || $token === $expected;
@@ -305,52 +328,41 @@ class VisitController extends BaseController
     private function normalizeDateToIso(string $date): ?string
     {
         $date = trim($date);
-        if (preg_match('#^\d{4}-\d{2}-\d{2}$#', $date)) {
-            return $date;
-        }
-        if (preg_match('#^(\d{2})-(\d{2})-(\d{4})$#', $date, $m)) {
-            return "{$m[3]}-{$m[2]}-{$m[1]}";
-        }
+        if (preg_match('#^\d{4}-\d{2}-\d{2}$#', $date)) return $date;
+        if (preg_match('#^(\d{2})-(\d{2})-(\d{4})$#', $date, $m)) return "{$m[3]}-{$m[2]}-{$m[1]}";
         return null;
     }
 
     private function isoToDmy(string $iso): string
     {
-        if (preg_match('#^(\d{4})-(\d{2})-(\d{2})$#', $iso, $m)) {
-            return "{$m[3]}-{$m[2]}-{$m[1]}";
-        }
+        if (preg_match('#^(\d{4})-(\d{2})-(\d{2})$#', $iso, $m)) return "{$m[3]}-{$m[2]}-{$m[1]}";
         return $iso;
     }
 
     /**
-     * Robust pet lookup:
-     * - Honors optional .env overrides: PETS_TABLE, PETS_UID_COLUMN
-     * - If not set, auto-detects a valid (table, column) pair from common variants
-     *   and caches the result for the request.
+     * Robust pet lookup; auto-detects pets.unique_id (your schema) and supports .env overrides.
      */
     private function petIdFromUid(string $uid, ?BaseConnection $db = null): ?int
     {
         $db ??= db_connect();
 
-        // .env overrides (optional)
+        // Optional explicit config
         $cfgTable  = env('PETS_TABLE', 'pets');
         $cfgColumn = env('PETS_UID_COLUMN', 'unique_id');
 
-        // Try configured/default pair first
+        // Try configured/default
         try {
             $row = $db->query("SELECT id FROM {$cfgTable} WHERE {$cfgColumn} = ? LIMIT 1", [$uid])->getRowArray();
-            if ($row && isset($row['id'])) {
-                return (int) $row['id'];
-            }
+            if ($row && isset($row['id'])) return (int) $row['id'];
         } catch (\Throwable $e) {
-            // fall through to detect
+            // fall through
         }
 
-        // Auto-detect once per request
+        // Auto-detect common variants once per request
         static $cached = null;
         if ($cached === null) {
             $candidates = [
-                ['pets', 'unique_id'],
+                ['pets', 'unique_id'],          // your live schema
                 ['pets', 'patient_unique_id'],
                 ['patients', 'unique_id'],
                 ['patients', 'patient_unique_id'],
@@ -361,14 +373,9 @@ class VisitController extends BaseController
                 try {
                     $probe = $db->query("SHOW COLUMNS FROM {$t} LIKE ?", [$c])->getResultArray();
                     if ($probe) { $cached = [$t, $c]; break; }
-                } catch (\Throwable $e) {
-                    // ignore
-                }
+                } catch (\Throwable $e) {}
             }
-            // If none detected, lock to configured/default to avoid repeated probing
-            if ($cached === null) {
-                $cached = [$cfgTable, $cfgColumn];
-            }
+            if ($cached === null) $cached = [$cfgTable, $cfgColumn];
         }
 
         [$t, $c] = $cached;
@@ -399,10 +406,6 @@ class VisitController extends BaseController
         return (int) $db->insertID();
     }
 
-    /**
-     * Ensure today’s visit exists and return its ID.
-     * Uses latest existing if present; else creates seq = (max+1) or 1 if none.
-     */
     private function ensureVisitForToday(int $petId, ?BaseConnection $db = null): ?int
     {
         $db = $db ?? db_connect();
@@ -412,21 +415,15 @@ class VisitController extends BaseController
             [$petId, $today]
         )->getRowArray();
 
-        if ($row) {
-            return (int) $row['id'];
-        }
+        if ($row) return (int) $row['id'];
 
         $seq = $this->nextVisitSeqForDate($petId, $today, $db) + 1;
         return $this->createVisit($petId, $today, max(1, $seq), $db);
     }
 
-    /**
-     * Count existing docs for ddmmyy/uid to pick the next 2-digit suffix.
-     */
     private function nextSequenceForDay(string $uid, string $ddmmyy, ?BaseConnection $db = null): int
     {
         $db = $db ?? db_connect();
-        // count filenames starting with 'ddmmyy-' and containing '-uid-'
         $like = $ddmmyy . '-%-' . $uid . '-%';
         $row = $db->query("SELECT COUNT(*) AS c FROM documents WHERE filename LIKE ?", [$like])->getRowArray();
         $seq = ((int) ($row['c'] ?? 0)) + 1;
@@ -434,9 +431,6 @@ class VisitController extends BaseController
         return $seq;
     }
 
-    /**
-     * Ensure unique name across DB and common FS roots; add -a, -b, ... then timestamp.
-     */
     private function uniqueFilename(string $baseStem, string $ext, ?BaseConnection $db = null): string
     {
         $db = $db ?? db_connect();
@@ -445,8 +439,8 @@ class VisitController extends BaseController
         $w = rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
         $p = rtrim(FCPATH,   '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
 
-        for ($i=0; $i<count($suffixes); $i++) {
-            $name = $baseStem . $suffixes[$i] . '.' . $ext;
+        foreach ($suffixes as $suf) {
+            $name = $baseStem . $suf . '.' . $ext;
             $existsDb = $db->table('documents')->where('filename', $name)->countAllResults() > 0;
             $existsFs = (is_file($w . $name) || is_file($p . $name));
             if (! $existsDb && ! $existsFs) return $name;
@@ -454,10 +448,6 @@ class VisitController extends BaseController
         return $baseStem . '-' . time() . '.' . $ext;
     }
 
-    /**
-     * Gather visits for a day with their documents.
-     * If $all=false, returns at most one (latest) visit for that date.
-     */
     private function fetchVisitsWithDocs(int $petId, string $isoDate, bool $all, ?BaseConnection $db = null): array
     {
         $db = $db ?? db_connect();
@@ -468,14 +458,10 @@ class VisitController extends BaseController
                   ->where('visit_date', $isoDate)
                   ->orderBy('visit_seq', $all ? 'ASC' : 'DESC');
 
-        if (! $all) {
-            $vis->limit(1);
-        }
+        if (! $all) $vis->limit(1);
 
         $visits = $vis->get()->getResultArray();
-        if (!$visits) {
-            return [];
-        }
+        if (!$visits) return [];
 
         $ids = array_map(fn($r) => (int) $r['id'], $visits);
         $docsByVisit = [];
@@ -492,7 +478,7 @@ class VisitController extends BaseController
                     'id'         => (int) $d['id'],
                     'type'       => (string) ($d['type'] ?? ''),
                     'filename'   => (string) ($d['filename'] ?? ''),
-                    'filesize'   => '', // not tracked; keep shape for your tester
+                    'filesize'   => '',
                     'created_at' => (string) ($d['created_at'] ?? ''),
                     'url'        => site_url('admin/visit/file?id=' . (int) $d['id']),
                 ];
@@ -508,7 +494,6 @@ class VisitController extends BaseController
                 'documents' => $docsByVisit[(int) $v['id']] ?? [],
             ];
         }
-
         return $out;
     }
 }
