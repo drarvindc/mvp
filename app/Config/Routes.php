@@ -141,3 +141,4 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 // Add these near the bottom of app/Config/Routes.php (BEFORE any catch-all);
 // This switches your main API to the Stable implementation that you just tested.
 
+$routes->get('admin/tools/visits-admin-view', 'Admin\Tools\VisitsAdminView::index');
