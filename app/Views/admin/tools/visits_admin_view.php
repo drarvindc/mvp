@@ -1,6 +1,4 @@
-<?php
-// Minimal AdminLTE‑friendly view; no layout includes to avoid coupling.
-?>
+<?php // Minimal AdminLTE‑friendly view; no layout includes to avoid coupling. ?>
 <!doctype html>
 <html>
 <head>
@@ -53,9 +51,10 @@
 </div>
 
 <script>
+// Force index.php in API paths to match server routing.
 const api = {
-  open: '<?= site_url('api/visit/open'); ?>',
-  byDate: '<?= site_url('api/visit/by-date'); ?>'
+  open:  '<?= base_url('index.php/api/visit/open'); ?>',
+  byDate:'<?= base_url('index.php/api/visit/by-date'); ?>'
 };
 
 function ddmmyyyy(date){
@@ -123,7 +122,7 @@ async function openToday(){
   const fd = new FormData(); fd.append('uid', uid);
   const res = await fetch(api.open, { method:'POST', body: fd });
   const data = await res.json(); setOut(data);
-  await load({uid, date: today(), all:true});
+  await load({uid, date: today()});
 }
 
 async function load(opts){
@@ -141,7 +140,6 @@ async function load(opts){
 document.getElementById('btnOpen').addEventListener('click', openToday);
 document.getElementById('btnLoad').addEventListener('click', ()=>load({}));
 
-// Preload if params present
 <?php if (!empty($_GET['uid']) && !empty($_GET['date'])): ?>
 load({ uid: '<?= esc($_GET['uid']) ?>', date: '<?= esc($_GET['date']) ?>' });
 <?php endif; ?>

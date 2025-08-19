@@ -55,12 +55,12 @@
   </div>
 
 <script>
+// Force index.php in API paths so routing matches your server config.
 const api = {
-  byDate: '<?= site_url('api/visit/by-date'); ?>'
+  byDate: '<?= base_url('index.php/api/visit/by-date'); ?>'
 };
 
 function fmtDate(d) {
-  // accepts dd-mm-yyyy or yyyy-mm-dd, returns dd-mm-yyyy
   if (!d) return '';
   if (/^\d{2}-\d{2}-\d{4}$/.test(d)) return d;
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
@@ -83,7 +83,6 @@ function render(data){
   const box = document.getElementById('visits');
   box.innerHTML = '';
   if (!data || !data.ok) { box.textContent = 'No data'; return; }
-  const list = [];
   (data.results||[]).forEach(v => {
     const h = document.createElement('div');
     h.style.marginBottom = '14px';
