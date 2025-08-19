@@ -17,6 +17,8 @@
 
             <!-- New link added -->
             <li><a class="list-group-item" href="<?= site_url('admin/tools/visits-admin-view') ?>">Visits Admin View</a></li>
+			<li><a href="<?= site_url('admin/tools/upload-tester-multi'); ?>">Visual Upload Tester (multi)</a></li>
+
         </ul>
     </div>
 </body>

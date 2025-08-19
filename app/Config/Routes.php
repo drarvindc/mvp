@@ -181,3 +181,9 @@ $routes->group('admin', ['filter' => ['devopenaccess']], static function ($route
     $routes->get('tools/visits-admin-view', 'Admin\Tools\VisitsAdminView::index'); // keep canonical
 });
 
+
+// --- Visual multi-upload tester (dev-open) ---
+$routes->group('admin/tools', ['filter' => 'devopen'], static function($routes) {
+    $routes->get('upload-tester-multi', 'Admin\Tools\UploadTesterMulti::index');
+});
+
