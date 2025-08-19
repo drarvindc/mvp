@@ -207,3 +207,12 @@ $routes->get('api/visit/by-date', 'Api\VisitController::byDate'); // GET ?uid=..
 $routes->post('api/visit/open',   'Api\VisitController::open');   // POST uid=...
 // (Optional) keep existing testers that hit Api\VisitController::upload working via proxy:
 $routes->post('api/visit/upload', 'Api\VisitController::upload');
+
+
+// ===== HARD OVERRIDES for Visits-Lite & Admin view =====
+// Force these to the API controller that HAS byDate/open.
+$routes->group('', ['namespace' => 'App\Controllers\Api'], static function($routes) {
+    $routes->get('api/visit/by-date', 'VisitController::byDate'); // GET ?uid=...&today=1|date=dd-mm-yyyy&all=1
+    $routes->post('api/visit/open',   'VisitController::open');   // POST uid=...
+    $routes->post('api/visit/upload', 'VisitController::upload'); // keep testers working (proxy to Stable)
+});
