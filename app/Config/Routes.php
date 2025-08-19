@@ -223,3 +223,13 @@ $routes->group('api/v2/visit', ['namespace' => 'App\Controllers\Api'], static fu
     $routes->post('open',   'VisitController::open');     // POST uid=...
     $routes->post('upload', 'VisitController::upload');   // optional proxy, keeps testers working if needed
 });
+
+// Admin Settings UI + JSON (dev open; add auth later when you re-enable it)
+$routes->group('admin/tools', ['namespace' => 'App\Controllers\Admin\Tools'], static function ($routes) {
+    $routes->get('settings-ui',   'Settings::index');
+    $routes->post('settings-save','Settings::save');
+
+    // Back-compat JSON endpoints already used earlier
+    $routes->get('settings',           'Settings::json');
+    $routes->post('settings/toggle',   'Settings::toggle');
+});
