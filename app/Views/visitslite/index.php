@@ -55,9 +55,9 @@
   </div>
 
 <script>
-// Force index.php in API paths so routing matches your server config.
+// Use conflict-free v2 endpoints and force index.php
 const api = {
-  byDate: '<?= base_url('index.php/api/visit/by-date'); ?>'
+  byDate: '<?= base_url('index.php/api/v2/visit/by-date'); ?>'
 };
 
 function fmtDate(d) {

@@ -216,3 +216,10 @@ $routes->group('', ['namespace' => 'App\Controllers\Api'], static function($rout
     $routes->post('api/visit/open',   'VisitController::open');   // POST uid=...
     $routes->post('api/visit/upload', 'VisitController::upload'); // keep testers working (proxy to Stable)
 });
+
+// === Conflict-free v2 API used by Visits-Lite + Admin view ===
+$routes->group('api/v2/visit', ['namespace' => 'App\Controllers\Api'], static function ($routes) {
+    $routes->get('by-date', 'VisitController::byDate');   // GET ?uid=...&today=1|date=dd-mm-yyyy&all=1
+    $routes->post('open',   'VisitController::open');     // POST uid=...
+    $routes->post('upload', 'VisitController::upload');   // optional proxy, keeps testers working if needed
+});

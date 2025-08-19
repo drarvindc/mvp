@@ -51,10 +51,10 @@
 </div>
 
 <script>
-// Force index.php in API paths to match server routing.
+// Use conflict-free v2 endpoints and force index.php
 const api = {
-  open:  '<?= base_url('index.php/api/visit/open'); ?>',
-  byDate:'<?= base_url('index.php/api/visit/by-date'); ?>'
+  open:  '<?= base_url('index.php/api/v2/visit/open'); ?>',
+  byDate:'<?= base_url('index.php/api/v2/visit/by-date'); ?>'
 };
 
 function ddmmyyyy(date){
