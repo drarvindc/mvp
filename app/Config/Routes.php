@@ -142,3 +142,34 @@ $routes->get('admin/tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::in
 // This switches your main API to the Stable implementation that you just tested.
 
 $routes->get('admin/tools/visits-admin-view', 'Admin\Tools\VisitsAdminView::index');
+
+
+/**
+ * === SAFE ADMIN/TOOLS ROUTES (ADD-ONLY) ===
+ * Keep this block at the end of Routes.php
+ * It restores /admin and /admin/tools and adds visits-admin-view.
+ * All routes use devopenaccess so you can work without auth in DEV.
+ */
+$routes->group('admin', ['filter' => ['devopenaccess']], static function ($routes) {
+    // Land on the Tools menu
+    $routes->get('/', 'Admin\Tools\Menu::index');
+    $routes->get('tools', 'Admin\Tools\Menu::index');
+
+    // Existing tools (kept here so all are discoverable from /admin/tools)
+    $routes->get('tools/migrate', 'Admin\Tools\Migrate::index');
+    $routes->get('tools/api-tester', 'Admin\Tools\ApiTester::index');
+    $routes->get('tools/api-tester-android', 'Admin\Tools\ApiTesterAndroid::index');
+    $routes->get('tools/api-tester-classic', 'Admin\Tools\ApiTesterClassic::index');
+    $routes->get('tools/stable-api-tester', 'Admin\Tools\StableApiTester::index');
+    $routes->get('tools/db-check', 'Admin\Tools\DbCheck::index');
+
+    // Debug pages that expect a ?key=...; keep their stricter filter if you want
+    $routes->get('tools/migrate-debug', 'Admin\Tools\MigrateDebug::index', ['filter' => 'stableapiauth']);
+    $routes->get('tools/migrate-debug-step', 'Admin\Tools\MigrateDebugStep::index', ['filter' => 'stableapiauth']);
+
+    // New: Visits Admin View (read-only dashboard that calls your existing API)
+    $routes->get('tools/visits-admin-view', 'Admin\Tools\VisitsAdminView::index');
+});
+
+// Optional public alias (kept since it appears in your links page)
+$routes->get('tools/visits-admin-view', 'Admin\Tools\VisitsAdminView::index', ['filter' => 'devopenaccess']);
