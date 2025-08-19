@@ -1,260 +1,270 @@
 <?php
+declare(strict_types=1);
+
 namespace App\Controllers\Stable;
 
-use CodeIgniter\RESTful\ResourceController;
+use App\Controllers\BaseController;
+use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\HTTP\ResponseInterface;
 
-class VisitController extends ResourceController
+class VisitController extends BaseController
 {
-    protected $format = 'json';
-    protected $allowedTypes = ['rx','photo','doc','xray','lab','usg','invoice'];
-    protected $allowedMimes = ['image/jpeg','image/png','image/webp','application/pdf'];
-    protected $maxBytes = 10485760; // 10 MB
-    const STORAGE_BASE = WRITEPATH . 'patients';
-
-    protected function findPetByUid(string $uid)
+    /**
+     * POST /stable/visit/upload
+     * Required:
+     *   - uid  (6 digits)
+     *   - type = rx|photo|doc|xray|lab|usg|invoice
+     * File(s):
+     *   - file  (single)  OR  file[] / files[]  (multiple)
+     * Notes:
+     *   - note   (single note for all files) OR note[] (per file, matched by index)
+     *
+     * Single-file response (unchanged):
+     *   { ok:true, visitId: <int|null>, attachment: { id, type, filename, url, created_at } }
+     *
+     * Multi-file response:
+     *   { ok:true, visitId: <int|null>, attachments: [ { ... }, ... ] }
+     */
+    public function upload(): ResponseInterface
     {
-        $db = \Config\Database::connect();
-        return $db->table('pets')->where('unique_id', $uid)->get()->getRowArray();
-    }
+        $uid  = trim((string) ($this->request->getPost('uid') ?? ''));
+        $type = strtolower(trim((string) ($this->request->getPost('type') ?? '')));
 
-    protected function ensureVisit(int $petId, string $date, bool $forceNew): array
-    {
-        $db = \Config\Database::connect();
-        if (!$forceNew) {
-            $existing = $db->table('visits')
-                           ->where(['pet_id'=>$petId,'visit_date'=>$date])
-                           ->orderBy('visit_seq','DESC')->get(1)->getRowArray();
-            if ($existing) return $existing;
+        if ($uid === '' || strlen($uid) !== 6) {
+            return $this->json(['ok' => false, 'error' => 'uid_invalid'], 422);
         }
 
-        $db->transStart();
-        $row = $db->query('SELECT COALESCE(MAX(visit_seq),0) AS last_seq FROM visits WHERE pet_id=? AND visit_date=? FOR UPDATE', [$petId, $date])->getRowArray();
-        $next = (int)($row['last_seq'] ?? 0) + 1;
-        $db->table('visits')->insert([
-            'pet_id'     => $petId,
-            'visit_date' => $date,
-            'visit_seq'  => $next,
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
-        $id = (int)$db->insertID();
-        $db->transComplete();
-        if (!$db->transStatus()) {
-            throw new \RuntimeException('db_txn_failed');
+        $allowed = ['rx','photo','doc','xray','lab','usg','invoice'];
+        if ($type === '' || ! in_array($type, $allowed, true)) {
+            return $this->json(['ok' => false, 'error' => 'type_invalid', 'allowed' => $allowed], 422);
         }
-        return ['id'=>$id,'pet_id'=>$petId,'visit_date'=>$date,'visit_seq'=>$next];
-    }
+        $typeDb = ($type === 'rx') ? 'prescription' : $type;
 
-    protected function dmyToIso(?string $s): string
-    {
-        helper('datefmt');
-        $iso = dmy_to_iso($s);
-        return $iso ?: date('Y-m-d');
-    }
-
-    protected function isoToDmy(?string $s): string
-    {
-        helper('datefmt');
-        return iso_to_dmy($s) ?: date('d-m-Y');
-    }
-
-    private function toBool($v): bool
-    {
-        if (is_bool($v)) return $v;
-        $s = strtolower((string)$v);
-        return in_array($s, ['1','true','yes','on'], true);
-    }
-
-    public function open()
-    {
-        $uid = trim((string)$this->request->getVar('uid'));
-        if (!preg_match('/^\d{6}$/', $uid)) {
-            return $this->respond(['ok'=>false,'error'=>'uid_invalid'], 400);
+        // Collect files (single or multiple)
+        $files = [];
+        $one = $this->request->getFile('file');
+        if ($one && $one->isValid()) {
+            $files = [$one];
+        } else {
+            $files = $this->request->getFileMultiple('file');
+            if (empty($files)) {
+                $files = $this->request->getFileMultiple('files');
+            }
         }
-        $pet = $this->findPetByUid($uid);
-        if (!$pet) return $this->respond(['ok'=>false,'error'=>'uid_not_found'], 404);
+        if (empty($files)) {
+            return $this->json(['ok' => false, 'error' => 'file_missing_or_invalid'], 422);
+        }
 
-        $force = $this->toBool($this->request->getVar('forceNewVisit'));
-        $iso = date('Y-m-d'); // today
+        // Normalize notes to array aligned to files (fixes "Array to string conversion")
+        $noteInput = $this->request->getPost('note');
+        if (is_array($noteInput)) {
+            $notes = array_values($noteInput);
+        } elseif (is_string($noteInput) && $noteInput !== '') {
+            $notes = array_fill(0, count($files), $noteInput);
+        } else {
+            $notes = array_fill(0, count($files), null);
+        }
+
+        $db    = db_connect();
+        $petId = $this->petIdFromUid($uid, $db); // may be null; still accept upload
+
+        // Try to attach to today's visit if we can resolve petId
+        $visitId = null;
         try {
-            $visit = $this->ensureVisit((int)$pet['id'], $iso, $force);
+            if ($petId) {
+                $visitId = $this->ensureVisitForToday($petId, db: $db);
+            }
         } catch (\Throwable $e) {
-            return $this->respond(['ok'=>false,'error'=>'db_error'], 500);
+            $visitId = null;
         }
 
-        $seq = isset($visit['visit_seq']) ? (int)$visit['visit_seq'] : 1;
-        if ($seq < 1) $seq = 1;
+        $ddmmyy    = date('dmy');
+        $targetDir = rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads';
+        @is_dir($targetDir) || @mkdir($targetDir, 0775, true);
 
-        return $this->respond([
-            'ok'=>true,
-            'visit'=>[
-                'id'=>(int)$visit['id'],
-                'uid'=>$uid,
-                'date'=>$this->isoToDmy($iso),
-                'sequence'=>$seq,
-                'wasCreated'=>$force
-            ]
-        ], 200);
-    }
+        $attachments = [];
+        foreach ($files as $i => $f) {
+            if (! $f || ! $f->isValid()) {
+                $attachments[] = ['error' => 'file_invalid'];
+                continue;
+            }
 
-    public function upload()
-    {
-        $uid  = trim((string)$this->request->getVar('uid'));
-        $type = strtolower(trim((string)$this->request->getVar('type')));
-        $note = (string)$this->request->getVar('note');
-        $force = $this->toBool($this->request->getVar('forceNewVisit'));
-        $file = $this->request->getFile('file');
+            $seq   = $this->nextSequenceForDay($uid, $ddmmyy, $db);
+            $ext   = strtolower($f->getClientExtension() ?: pathinfo($f->getName(), PATHINFO_EXTENSION) ?: 'bin');
+            $stem  = sprintf('%s-%s-%s-%02d', $ddmmyy, $type, $uid, $seq);
+            $final = $this->uniqueFilename($stem, $ext, $db);
 
-        if (!preg_match('/^\d{6}$/', $uid)) return $this->respond(['ok'=>false,'error'=>'uid_invalid'], 400);
-        if (!$type || !in_array($type, $this->allowedTypes, true)) return $this->respond(['ok'=>false,'error'=>'type_invalid'], 415);
-        if (!$file || !$file->isValid()) return $this->respond(['ok'=>false,'error'=>'file_required'], 400);
+            $targetPath = $targetDir . DIRECTORY_SEPARATOR . $final;
+            try {
+                $f->move($targetDir, $final, true);
+            } catch (\Throwable $e) {
+                $attachments[] = ['error' => 'file_move_failed', 'detail' => $e->getMessage()];
+                continue;
+            }
 
-        $mime = $file->getMimeType();
-        $size = $file->getSize();
-        $ext  = strtolower($file->getExtension() ?: pathinfo($file->getName(), PATHINFO_EXTENSION));
+            $mime = (string) ($f->getMimeType() ?: '');
+            $size = (int) ($f->getSize() ?: 0);
+            $now  = date('Y-m-d H:i:s');
 
-        if ($size > $this->maxBytes) return $this->respond(['ok'=>false,'error'=>'file_too_large'], 413);
-        if (!in_array($mime, $this->allowedMimes, true)) return $this->respond(['ok'=>false,'error'=>'unsupported_media_type'], 415);
-        if (!in_array($ext, ['jpg','jpeg','png','pdf','webp'], true)) return $this->respond(['ok'=>false,'error'=>'unsupported_extension'], 415);
-
-        $pet = $this->findPetByUid($uid);
-        if (!$pet) return $this->respond(['ok'=>false,'error'=>'uid_not_found'], 404);
-
-        $iso = date('Y-m-d');
-        try {
-            $visit = $this->ensureVisit((int)$pet['id'], $iso, $force);
-            $visitId = (int)$visit['id'];
-        } catch (\Throwable $e) {
-            return $this->respond(['ok'=>false,'error'=>'db_error'], 500);
-        }
-
-        $yyyy = substr($iso, 0, 4);
-        $dir = rtrim(self::STORAGE_BASE, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $yyyy . DIRECTORY_SEPARATOR . $uid;
-        if (!is_dir($dir) and !@mkdir($dir, 0775, true)) {
-            return $this->respond(['ok'=>false,'error'=>'storage_unwritable'], 500);
-        }
-
-        // Unique serial across ANY extension
-        $ddmmyy = date('dmy', strtotime($iso));
-        $base = "{$ddmmyy}-{$type}-{$uid}";
-        $existing = glob($dir . DIRECTORY_SEPARATOR . $base . '.*') ?: [];
-        $existing2 = glob($dir . DIRECTORY_SEPARATOR . $base . '-[0-9][0-9].*') ?: [];
-        $existing = array_merge($existing, $existing2);
-        $next = max(1, count($existing) + 1);
-        $name = sprintf('%s-%02d.%s', $base, $next, $ext);
-
-        try {
-            $file->move($dir, $name, true);
-        } catch (\Throwable $e) {
-            return $this->respond(['ok'=>false,'error'=>'upload_failed'], 500);
-        }
-        $full = $dir . DIRECTORY_SEPARATOR . $name;
-
-        $db = \Config\Database::connect();
-        $row = [
-            'visit_id'   => $visitId,
-            'pet_id'     => (int)$pet['id'],
-            'type'       => $type,
-            'filename'   => $name,
-            'filesize'   => @filesize($full) ?: $size,
-            'mime'       => $mime,
-            'note'       => $note,
-            'created_at' => date('Y-m-d H:i:s'),
-        ];
-
-        try { $fields = $db->getFieldNames('documents'); } catch (\Throwable $e) { $fields = array_keys($row); }
-        $filtered = array_intersect_key($row, array_flip($fields));
-
-        try {
-            $db->table('documents')->insert($filtered);
-        } catch (\Throwable $e2) {
-            $essentials = ['visit_id','type','filename','filesize','created_at'];
-            $filtered2 = array_intersect_key($row, array_flip($essentials));
-            try { $db->table('documents')->insert($filtered2); }
-            catch (\Throwable $e3) { return $this->respond(['ok'=>false,'error'=>'db_insert_failed'], 500); }
-        }
-        $docId = (int) $db->insertID();
-
-        return $this->respond([
-            'ok'=>true,
-            'visitId'=>$visitId,
-            'attachment'=>[
-                'id'=>$docId,
-                'type'=>$type,
-                'filename'=>$name,
-                'url'=>site_url('admin/visit/file?id='.$docId),
-                'created_at'=>date('c'),
-            ]
-        ], 201);
-    }
-
-    // Maps any documents with NULL visit_id to today's latest visit for their pet_id
-    public function mapOrphans()
-    {
-        $db = \Config\Database::connect();
-        $today = date('Y-m-d');
-
-        $orphans = $db->table('documents')->where('visit_id', null)->get()->getResultArray();
-        $mapped = 0; $skipped = 0;
-
-        foreach ($orphans as $d) {
-            $petId = (int)($d['pet_id'] ?? 0);
-            if (!$petId) { $skipped++; continue; }
-
-            // ensure visit for today (do not force new so it reuses latest)
-            $visit = $this->ensureVisit($petId, $today, false);
+            $doc = [
+                'patient_unique_id' => $uid,
+                'pet_id'            => $petId,
+                'visit_id'          => $visitId,
+                'type'              => $typeDb,
+                'subtype'           => null,
+                'path'              => 'writable/uploads/' . $final,
+                'filename'          => $final,
+                'source'            => 'web',
+                'ref_id'            => null,
+                'seq'               => null,
+                'mime'              => $mime ?: null,
+                'size_bytes'        => $size ?: null,
+                'captured_at'       => $now,
+                'checksum_sha1'     => sha1_file($targetPath),
+                'created_at'        => $now,
+                'note'              => $notes[$i] ?? null, // <- always string|null
+            ];
 
             try {
-                $db->table('documents')->where('id', (int)$d['id'])->update(['visit_id' => (int)$visit['id']]);
-                $mapped++;
+                $db->table('documents')->insert($doc);
+                $docId = (int) $db->insertID();
+                $attachments.append([
+                    'id'         => $docId,
+                    'type'       => $type,
+                    'filename'   => $final,
+                    'url'        => site_url('admin/visit/file?id=' . $docId),
+                    'created_at' => $now,
+                ]);
             } catch (\Throwable $e) {
-                $skipped++;
+                @unlink($targetPath);
+                $attachments[] = ['error' => 'db_insert_failed', 'detail' => $e->getMessage()];
             }
         }
 
-        return $this->respond(['ok'=>true,'date'=>$this->isoToDmy($today),'mapped'=>$mapped,'skipped'=>$skipped], 200);
+        // Preserve legacy single-file shape
+        if (count($attachments) === 1 && isset($attachments[0]['id'])) {
+            return $this->json([
+                'ok'         => true,
+                'visitId'    => $visitId,
+                'attachment' => $attachments[0],
+            ]);
+        }
+
+        return $this->json([
+            'ok'          => true,
+            'visitId'     => $visitId,
+            'attachments' => $attachments,
+        ]);
     }
 
-    public function today()
+    // ----------------- Helpers -----------------
+
+    private function json(array $payload, int $status = 200): ResponseInterface
     {
-        $uid = trim((string)$this->request->getGet('uid'));
-        $dateIn = trim((string)($this->request->getGet('date') ?: date('Y-m-d')));
-        $all = $this->toBool($this->request->getGet('all'));
-
-        if (!preg_match('/^\d{6}$/', $uid)) return $this->respond(['ok'=>false,'error'=>'uid_invalid'], 400);
-        $pet = $this->findPetByUid($uid);
-        if (!$pet) return $this->respond(['ok'=>false,'error'=>'uid_not_found'], 404);
-
-        $isoDate = $this->dmyToIso($dateIn);
-
-        $db = \Config\Database::connect();
-        $qb = $db->table('visits')->where(['pet_id'=>(int)$pet['id'],'visit_date'=>$isoDate]);
-        $visits = $all ? $qb->orderBy('visit_seq','ASC')->get()->getResultArray()
-                       : $qb->orderBy('visit_seq','DESC')->get(1)->getResultArray();
-
-        $out = [];
-        foreach ($visits as $v) {
-            $docs = $db->table('documents')->where('visit_id', $v['id'])->orderBy('id','ASC')->get()->getResultArray();
-            $doclist = [];
-            foreach ($docs as $d) {
-                $doclist[] = [
-                    'id'=>(int)$d['id'],
-                    'type'=>$d['type'] ?? 'file',
-                    'filename'=>$d['filename'] ?? '',
-                    'filesize'=>isset($d['filesize']) ? strval($d['filesize']) : '',
-                    'created_at'=>$d['created_at'] ?? '',
-                    'url'=>site_url('admin/visit/file?id=' . $d['id'])
-                ];
-            }
-            $out[] = [
-                'id'=>(int)$v['id'],
-                'date'=>$this->isoToDmy($v['visit_date']),
-                'sequence'=>(int)$v['visit_seq'],
-                'documents'=>$doclist
-            ];
-        }
-
-        return $this->respond(['ok'=>true,'date'=>$this->isoToDmy($isoDate),'results'=>$out], 200);
+        return $this->response->setStatusCode($status)->setJSON($payload);
     }
 
-    public function byDate() { return $this->today(); }
+    private function petIdFromUid(string $uid, ?BaseConnection $db = null): ?int
+    {
+        $db ??= db_connect();
+
+        // Explicit live schema (your server): pets.unique_id
+        $cfgTable  = env('PETS_TABLE', 'pets');
+        $cfgColumn = env('PETS_UID_COLUMN', 'unique_id');
+
+        try {
+            $row = $db->query("SELECT id FROM {$cfgTable} WHERE {$cfgColumn} = ? LIMIT 1", [$uid])->getRowArray();
+            if ($row && isset($row['id'])) {
+                return (int) $row['id'];
+            }
+        } catch (\Throwable $e) { /* fallback below */ }
+
+        // Fallback probing if envs differ later
+        static $cached = null;
+        if ($cached === null) {
+            $candidates = [
+                ['pets','unique_id'],
+                ['pets','patient_unique_id'],
+                ['patients','unique_id'],
+                ['patients','patient_unique_id'],
+            ];
+            foreach ($candidates as [$t,$c]) {
+                try {
+                    $probe = $db->query("SHOW COLUMNS FROM {$t} LIKE ?", [$c])->getResultArray();
+                    if ($probe) { $cached = [$t,$c]; break; }
+                } catch (\Throwable $e) {}
+            }
+            if ($cached === null) $cached = [$cfgTable, $cfgColumn];
+        }
+
+        [$t,$c] = $cached;
+        try {
+            $row = $db->query("SELECT id FROM {$t} WHERE {$c} = ? LIMIT 1", [$uid])->getRowArray();
+            return $row ? (int) $row['id'] : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function ensureVisitForToday(int $petId, ?BaseConnection $db = null): ?int
+    {
+        $db = $db ?? db_connect();
+        $today = date('Y-m-d');
+
+        $row = $db->query(
+            "SELECT id, visit_seq FROM visits WHERE pet_id=? AND visit_date=? ORDER BY visit_seq DESC LIMIT 1",
+            [$petId, $today]
+        )->getRowArray();
+
+        if ($row) return (int) $row['id'];
+
+        $seq = $this->nextVisitSeqForDate($petId, $today, $db) + 1;
+        return $this->createVisit($petId, $today, max(1, $seq), $db);
+    }
+
+    private function nextVisitSeqForDate(int $petId, string $isoDate, ?BaseConnection $db = null): int
+    {
+        $db = $db ?? db_connect();
+        $row = $db->query("SELECT MAX(visit_seq) AS mx FROM visits WHERE pet_id=? AND visit_date=?", [$petId, $isoDate])->getRowArray();
+        return (int) ($row['mx'] ?? 0);
+    }
+
+    private function createVisit(int $petId, string $isoDate, int $seq, ?BaseConnection $db = null): int
+    {
+        $db = $db ?? db_connect();
+        $db->table('visits')->insert([
+            'pet_id'     => $petId,
+            'visit_date' => $isoDate,
+            'visit_seq'  => $seq,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        return (int) $db->insertID();
+    }
+
+    private function nextSequenceForDay(string $uid, string $ddmmyy, ?BaseConnection $db = null): int
+    {
+        $db = $db ?? db_connect();
+        $like = $ddmmyy . '-%-' . $uid . '-%';
+        $row = $db->query("SELECT COUNT(*) AS c FROM documents WHERE filename LIKE ?", [$like])->getRowArray();
+        $seq = ((int) ($row['c'] ?? 0)) + 1;
+        if ($seq > 99) $seq = 99;
+        return $seq;
+    }
+
+    private function uniqueFilename(string $baseStem, string $ext, ?BaseConnection $db = null): string
+    {
+        $db = $db ?? db_connect();
+        $suffixes = ['', '-a','-b','-c','-d','-e','-f','-g','-h','-i','-j'];
+
+        $w = rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
+        $p = rtrim(FCPATH,   '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
+
+        foreach ($suffixes as $suf) {
+            $name = $baseStem . $suf . '.' . $ext;
+            $existsDb = $db->table('documents')->where('filename', $name)->countAllResults() > 0;
+            $existsFs = (is_file($w . $name) || is_file($p . $name));
+            if (! $existsDb && ! $existsFs) return $name;
+        }
+        return $baseStem . '-' . time() . '.' . $ext;
+    }
 }
