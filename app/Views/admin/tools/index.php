@@ -22,5 +22,32 @@
 
         </ul>
     </div>
+	<hr>
+<h3>Settings</h3>
+<div id="autoMapRow">
+  <label>
+    <input type="checkbox" id="autoMapChk"> Auto‑map orphan docs on upload
+  </label>
+  <span id="autoMapState" style="margin-left:8px;color:#666"></span>
+</div>
+<script>
+(async function(){
+  try {
+    const r = await fetch('<?= site_url('admin/tools/settings'); ?>');
+    const j = await r.json();
+    const chk = document.getElementById('autoMapChk');
+    const st  = document.getElementById('autoMapState');
+    chk.checked = (j.auto_map_orphans === '1');
+    st.textContent = chk.checked ? '(enabled)' : '(disabled)';
+    chk.addEventListener('change', async ()=>{
+      const fd = new FormData(); fd.append('enable', chk.checked ? '1' : '0');
+      const rr = await fetch('<?= site_url('admin/tools/settings/toggle'); ?>', { method:'POST', body: fd });
+      const jj = await rr.json();
+      st.textContent = (jj.auto_map_orphans === '1') ? '(enabled)' : '(disabled)';
+    });
+  } catch(e) { console.error(e); }
+})();
+</script>
+
 </body>
 </html>

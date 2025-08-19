@@ -186,3 +186,11 @@ $routes->group('admin', ['filter' => ['devopenaccess']], static function ($route
 // --- OVERRIDE: Visual multi-upload tester (no filter) ---
 $routes->get('admin/tools/upload-tester-multi', 'Admin\Tools\UploadTesterMulti::index');
 
+// Visits Lite (public)
+$routes->get('visits-lite', 'VisitsLite::index');
+
+// Admin Tools: Settings (DEV open right now; tighten later)
+$routes->group('admin/tools', static function($routes) {
+    $routes->get('settings', 'Admin\Tools\Settings::index');       // GET -> { ok, auto_map_orphans }
+    $routes->post('settings/toggle', 'Admin\Tools\Settings::toggle'); // POST enable=1|0
+});

@@ -1,142 +1,132 @@
-<?php
-// app/Views/visitslite/index.php
-$apiToken = env('ANDROID_API_TOKEN');
-$uid  = $_GET['uid']  ?? '';
-$date = $_GET['date'] ?? date('Y-m-d'); // browser date input default
-?>
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>Visits Lite</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <style>
-    .pill { padding: .4rem .9rem; border:1px solid #ced4da; border-radius: 999px; background:#f8f9fa; cursor:pointer; }
-    .pill.active { background:#e9ecef; border-color:#adb5bd; }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:16px}
+    .row{display:flex;gap:16px;flex-wrap:wrap}
+    .card{border:1px solid #ddd;border-radius:8px;padding:12px;flex:1 1 380px;max-width:640px}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .pill{display:inline-block;background:#eef;padding:4px 8px;border-radius:20px;margin:0 6px 6px 0;text-decoration:none;color:#223}
+    .muted{color:#666;font-size:.9rem}
+    .grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+    .json{white-space:pre-wrap;background:#0b1420;color:#d1e7ff;padding:10px;border-radius:6px;max-height:260px;overflow:auto}
+    label{font-weight:600}
+    input,select,button{font-size:16px;padding:8px;border-radius:6px;border:1px solid #bbb}
+    button{cursor:pointer;background:#2563eb;color:#fff;border:0}
+    button.secondary{background:#475569}
+    .files a{display:inline-block;margin:0 8px 6px 0}
   </style>
 </head>
-<body class="container py-3">
-  <h4 class="mb-3">Visits Lite</h4>
+<body>
+  <h2>Visits Lite</h2>
+  <p class="muted">Quick, public view to list same‑day visits + attachments. Supports <span class="mono">uid</span> with either <span class="mono">today=1</span> or a specific <span class="mono">date</span> (dd-mm-yyyy or yyyy-mm-dd). Optional: <span class="mono">all=1</span> for all visits that day.</p>
 
-  <div class="row g-2 align-items-end">
-    <div class="col-auto">
-      <label class="form-label">UID</label>
-      <input id="uid" class="form-control" value="<?= htmlspecialchars($uid, ENT_QUOTES) ?>" />
+  <div class="row">
+    <div class="card">
+      <div class="grid">
+        <label for="uid">UID</label>
+        <input id="uid" placeholder="250001" />
+        <label for="date">Date</label>
+        <input id="date" placeholder="dd-mm-yyyy or yyyy-mm-dd" />
+        <span></span>
+        <div>
+          <label><input type="checkbox" id="today" /> today</label>
+          &nbsp;&nbsp;
+          <label><input type="checkbox" id="all" /> all visits</label>
+        </div>
+        <span></span>
+        <div>
+          <button id="btnLoad" class="">Load</button>
+          <button id="btnToday" class="secondary">Load Today</button>
+        </div>
+      </div>
     </div>
-    <div class="col-auto">
-      <label class="form-label">Date</label>
-      <input id="date" class="form-control" type="date" value="<?= htmlspecialchars($date, ENT_QUOTES) ?>" />
-      <div class="form-text">Displayed & API use: dd-mm-yyyy</div>
+
+    <div class="card">
+      <div id="visits"></div>
     </div>
-    <div class="col-auto">
-      <button id="loadBtn" class="btn btn-primary">Load</button>
+
+    <div class="card">
+      <div class="json mono small" id="out">[JSON]</div>
     </div>
   </div>
 
-  <div id="status" class="text-muted mt-3">Enter UID and Date, then Load.</div>
-  <div id="pills" class="d-flex gap-2 mt-2 flex-wrap"></div>
-  <div id="content" class="mt-3"></div>
+<script>
+const api = {
+  byDate: '<?= site_url('api/visit/by-date'); ?>'
+};
 
-  <script>
-  const TOKEN = <?= json_encode($apiToken) ?>; // from .env
-
-  function q(s){ return document.querySelector(s); }
-  function ce(t){ return document.createElement(t); }
-
-  function isoToDMY(s){
-    // yyyy-mm-dd -> dd-mm-yyyy
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-    // already dd-mm-yyyy or other
-    const n = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s);
-    if (n) return s;
-    // last resort
-    const d = new Date(s);
-    if (!isNaN(d)) {
-      const dd = String(d.getDate()).padStart(2,'0');
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const yy = d.getFullYear();
-      return `${dd}-${mm}-${yy}`;
-    }
-    return s;
+function fmtDate(d) {
+  // accepts dd-mm-yyyy or yyyy-mm-dd, returns dd-mm-yyyy
+  if (!d) return '';
+  if (/^\d{2}-\d{2}-\d{4}$/.test(d)) return d;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [Y,M,D] = d.split('-'); return `${D}-${M}-${Y}`;
   }
+  return d;
+}
 
-  async function fetchVisits(uid, dmy) {
-    const base = <?= json_encode(site_url('api/visit/today')) ?>;
-    const url = `${base}?uid=${encodeURIComponent(uid)}&date=${encodeURIComponent(dmy)}&all=1&token=${encodeURIComponent(TOKEN)}`;
-    const res = await fetch(url, { headers: { 'Accept':'application/json' } });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return res.json();
-  }
+function todayDDMMYYYY(){
+  const t = new Date();
+  const dd = String(t.getDate()).padStart(2,'0');
+  const mm = String(t.getMonth()+1).padStart(2,'0');
+  const yyyy = t.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
 
-  function render(data) {
-    const pills = q('#pills'); pills.innerHTML = '';
-    const content = q('#content'); content.innerHTML = '';
+function setOut(obj){ document.getElementById('out').textContent = JSON.stringify(obj,null,2); }
 
-    if (!data.ok || !data.results || data.results.length === 0) {
-      q('#status').textContent = 'No visits found for the given UID/date.';
-      return;
-    }
-    q('#status').textContent = `Found ${data.results.length} visit(s) for ${data.date}`;
-
-    data.results.forEach((v, idx) => {
-      const p = ce('button');
-      p.className = 'pill' + (idx===0 ? ' active' : '');
-      p.textContent = `Visit #${v.sequence}` + (v.sequence === 1 ? ' (AM)' : (v.sequence === 2 ? ' (PM)' : ''));
-      p.addEventListener('click', () => {
-        document.querySelectorAll('.pill').forEach(el => el.classList.remove('active'));
-        p.classList.add('active');
-        renderVisit(v);
-      });
-      pills.appendChild(p);
+function render(data){
+  const box = document.getElementById('visits');
+  box.innerHTML = '';
+  if (!data || !data.ok) { box.textContent = 'No data'; return; }
+  const list = [];
+  (data.results||[]).forEach(v => {
+    const h = document.createElement('div');
+    h.style.marginBottom = '14px';
+    const title = document.createElement('div');
+    title.innerHTML = `<strong>Visit #${v.sequence || v.visit_seq || 0}</strong> — ${v.date}`;
+    h.appendChild(title);
+    const files = document.createElement('div');
+    files.className = 'files';
+    (v.documents||[]).forEach(d => {
+      const a = document.createElement('a');
+      a.href = d.url;
+      a.target = '_blank';
+      a.textContent = d.filename || ('doc #'+d.id);
+      files.appendChild(a);
     });
-
-    renderVisit(data.results[0]);
-
-    function renderVisit(v) {
-      content.innerHTML = '';
-      const head = ce('div');
-      head.className = 'card card-body';
-      head.innerHTML = `<strong>Visit #${v.sequence}</strong> · ${v.date}`;
-      content.appendChild(head);
-
-      if (!v.documents || v.documents.length === 0) {
-        const empty = ce('div');
-        empty.className = 'text-muted mt-2';
-        empty.textContent = 'No documents for this visit.';
-        content.appendChild(empty);
-      } else {
-        v.documents.forEach(d => {
-          const card = ce('div');
-          card.className = 'card card-body mt-2';
-          const size = d.filesize ? `${d.filesize} bytes` : '';
-          const link = d.url || '#';
-          card.innerHTML = `<div><strong>${d.type || 'file'}</strong> — ${d.filename || ''}</div>
-                            <div class="text-muted small">${(d.created_at || '')} ${size ? ' · '+size : ''}</div>
-                            <div class="mt-2"><a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="${link}">Open</a></div>
-                            <div class="text-muted small mt-1">If this redirects, your file endpoint may require admin login.</div>`;
-          content.appendChild(card);
-        });
-      }
-    }
-  }
-
-  q('#loadBtn').addEventListener('click', async () => {
-    const uid = q('#uid').value.trim();
-    const iso = q('#date').value.trim(); // yyyy-mm-dd from input
-    const dmy = isoToDMY(iso);
-    q('#status').textContent = 'Loading...';
-    try {
-      const data = await fetchVisits(uid, dmy);
-      render(data);
-    } catch (e) {
-      q('#status').textContent = 'Error: ' + e.message;
-    }
+    if (!files.children.length) files.textContent = 'No attachments';
+    h.appendChild(files);
+    box.appendChild(h);
   });
+  if (!(data.results||[]).length) box.textContent = 'No visits found for given UID/date.';
+}
 
-  // auto-load if uid prefilled
-  if (q('#uid').value) q('#loadBtn').click();
-  </script>
+async function load(opts){
+  const uid = (opts && opts.uid) || document.getElementById('uid').value.trim();
+  const today = (opts && 'today' in opts) ? opts.today : document.getElementById('today').checked;
+  const date = (opts && 'date' in opts) ? opts.date : document.getElementById('date').value.trim();
+  const all  = (opts && 'all' in opts) ? opts.all : document.getElementById('all').checked;
+
+  const q = new URLSearchParams();
+  if (uid) q.append('uid', uid);
+  if (today) q.append('today', '1');
+  const ddmmyyyy = today ? todayDDMMYYYY() : fmtDate(date);
+  if (!today && ddmmyyyy) q.append('date', ddmmyyyy);
+  if (all) q.append('all','1');
+
+  const res = await fetch(`${api.byDate}?` + q.toString());
+  const data = await res.json();
+  setOut(data);
+  render(data);
+}
+
+document.getElementById('btnLoad').addEventListener('click', () => load({}));
+document.getElementById('btnToday').addEventListener('click', () => load({ today:true }));
+</script>
 </body>
 </html>
