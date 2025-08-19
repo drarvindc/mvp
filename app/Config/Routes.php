@@ -173,3 +173,4 @@ $routes->group('admin', ['filter' => ['devopenaccess']], static function ($route
 
 // Optional public alias (kept since it appears in your links page)
 $routes->get('tools/visits-admin-view', 'Admin\Tools\VisitsAdminView::index', ['filter' => 'devopenaccess']);
+$routes->get('admin/visit/file', 'Admin\VisitViewController::file', ['filter' => 'devopenaccess']);
