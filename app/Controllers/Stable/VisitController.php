@@ -14,16 +14,16 @@ class VisitController extends BaseController
      * Required:
      *   - uid  (6 digits)
      *   - type = rx|photo|doc|xray|lab|usg|invoice
-     * File(s):
-     *   - file  (single)  OR  file[] / files[]  (multiple)
+     * Files:
+     *   - file (single) OR file[] / files[] (multiple)
      * Notes:
-     *   - note   (single note for all files) OR note[] (per file, matched by index)
+     *   - note (single note for all) OR note[] (per file, by index)
      *
      * Single-file response (unchanged):
-     *   { ok:true, visitId: <int|null>, attachment: { id, type, filename, url, created_at } }
+     *   { ok:true, visitId:<int|null>, attachment:{ id,type,filename,url,created_at } }
      *
      * Multi-file response:
-     *   { ok:true, visitId: <int|null>, attachments: [ { ... }, ... ] }
+     *   { ok:true, visitId:<int|null>, attachments:[ { ... }, ... ] }
      */
     public function upload(): ResponseInterface
     {
@@ -40,7 +40,7 @@ class VisitController extends BaseController
         }
         $typeDb = ($type === 'rx') ? 'prescription' : $type;
 
-        // Collect files (single or multiple)
+        // Gather files (single or multiple)
         $files = [];
         $one = $this->request->getFile('file');
         if ($one && $one->isValid()) {
@@ -55,7 +55,7 @@ class VisitController extends BaseController
             return $this->json(['ok' => false, 'error' => 'file_missing_or_invalid'], 422);
         }
 
-        // Normalize notes to array aligned to files (fixes "Array to string conversion")
+        // Normalize notes to per-file array (string|null for each)
         $noteInput = $this->request->getPost('note');
         if (is_array($noteInput)) {
             $notes = array_values($noteInput);
@@ -68,7 +68,7 @@ class VisitController extends BaseController
         $db    = db_connect();
         $petId = $this->petIdFromUid($uid, $db); // may be null; still accept upload
 
-        // Try to attach to today's visit if we can resolve petId
+        // Try to attach to today's visit (best effort)
         $visitId = null;
         try {
             if ($petId) {
@@ -94,6 +94,10 @@ class VisitController extends BaseController
             $stem  = sprintf('%s-%s-%s-%02d', $ddmmyy, $type, $uid, $seq);
             $final = $this->uniqueFilename($stem, $ext, $db);
 
+            // IMPORTANT: capture MIME/SIZE BEFORE move() to avoid finfo_file() temp-file issues
+            $mime = (string) ($f->getMimeType() ?: '');
+            $size = (int) ($f->getSize() ?: 0);
+
             $targetPath = $targetDir . DIRECTORY_SEPARATOR . $final;
             try {
                 $f->move($targetDir, $final, true);
@@ -102,8 +106,6 @@ class VisitController extends BaseController
                 continue;
             }
 
-            $mime = (string) ($f->getMimeType() ?: '');
-            $size = (int) ($f->getSize() ?: 0);
             $now  = date('Y-m-d H:i:s');
 
             $doc = [
@@ -122,19 +124,19 @@ class VisitController extends BaseController
                 'captured_at'       => $now,
                 'checksum_sha1'     => sha1_file($targetPath),
                 'created_at'        => $now,
-                'note'              => $notes[$i] ?? null, // <- always string|null
+                'note'              => $notes[$i] ?? null, // always string|null
             ];
 
             try {
                 $db->table('documents')->insert($doc);
                 $docId = (int) $db->insertID();
-                $attachments.append([
+                $attachments[] = [
                     'id'         => $docId,
                     'type'       => $type,
                     'filename'   => $final,
                     'url'        => site_url('admin/visit/file?id=' . $docId),
                     'created_at' => $now,
-                ]);
+                ];
             } catch (\Throwable $e) {
                 @unlink($targetPath);
                 $attachments[] = ['error' => 'db_insert_failed', 'detail' => $e->getMessage()];
