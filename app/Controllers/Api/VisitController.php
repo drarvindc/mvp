@@ -322,11 +322,58 @@ class VisitController extends BaseController
         return $iso;
     }
 
+    /**
+     * Robust pet lookup:
+     * - Honors optional .env overrides: PETS_TABLE, PETS_UID_COLUMN
+     * - If not set, auto-detects a valid (table, column) pair from common variants
+     *   and caches the result for the request.
+     */
     private function petIdFromUid(string $uid, ?BaseConnection $db = null): ?int
     {
-        $db = $db ?? db_connect();
+        $db ??= db_connect();
+
+        // .env overrides (optional)
+        $cfgTable  = env('PETS_TABLE', 'pets');
+        $cfgColumn = env('PETS_UID_COLUMN', 'unique_id');
+
+        // Try configured/default pair first
         try {
-            $row = $db->query("SELECT id FROM pets WHERE unique_id = ? LIMIT 1", [$uid])->getRowArray();
+            $row = $db->query("SELECT id FROM {$cfgTable} WHERE {$cfgColumn} = ? LIMIT 1", [$uid])->getRowArray();
+            if ($row && isset($row['id'])) {
+                return (int) $row['id'];
+            }
+        } catch (\Throwable $e) {
+            // fall through to detect
+        }
+
+        // Auto-detect once per request
+        static $cached = null;
+        if ($cached === null) {
+            $candidates = [
+                ['pets', 'unique_id'],
+                ['pets', 'patient_unique_id'],
+                ['patients', 'unique_id'],
+                ['patients', 'patient_unique_id'],
+                ['animals', 'unique_id'],
+                ['animals', 'patient_unique_id'],
+            ];
+            foreach ($candidates as [$t, $c]) {
+                try {
+                    $probe = $db->query("SHOW COLUMNS FROM {$t} LIKE ?", [$c])->getResultArray();
+                    if ($probe) { $cached = [$t, $c]; break; }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
+            // If none detected, lock to configured/default to avoid repeated probing
+            if ($cached === null) {
+                $cached = [$cfgTable, $cfgColumn];
+            }
+        }
+
+        [$t, $c] = $cached;
+        try {
+            $row = $db->query("SELECT id FROM {$t} WHERE {$c} = ? LIMIT 1", [$uid])->getRowArray();
             return $row ? (int) $row['id'] : null;
         } catch (\Throwable $e) {
             return null;
