@@ -194,3 +194,10 @@ $routes->group('admin/tools', static function($routes) {
     $routes->get('settings', 'Admin\Tools\Settings::index');       // GET -> { ok, auto_map_orphans }
     $routes->post('settings/toggle', 'Admin\Tools\Settings::toggle'); // POST enable=1|0
 });
+
+// --- Fix dash->camel case for API endpoints used by Visits Lite / Admin view ---
+$routes->get('api/visit/by-date', 'Api\VisitController::byDate');   // GET ?uid=...&date=dd-mm-yyyy&all=1
+$routes->post('api/visit/open',   'Api\VisitController::open');     // POST uid=...
+
+// Optional: a tiny UI page for Settings (since JSON works but Tools view may not show the block)
+$routes->get('admin/tools/settings-ui', 'Admin\Tools\Settings::index');
