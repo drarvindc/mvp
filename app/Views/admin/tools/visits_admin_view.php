@@ -22,8 +22,10 @@
       <input class="form-control" name="uid" id="uid" placeholder="250001" value="<?= esc($uid ?? '') ?>" required>
     </div>
     <div class="col-sm-3">
-      <label class="form-label">Date (dd-mm-yyyy)</label>
-      <input class="form-control" name="date" id="date" placeholder="11-08-2025" value="<?= esc($date ?? '') ?>" required>
+      <label class="form-label">Date</label>
+      <!-- Native date picker (ISO value). We'll convert to dd-mm-yyyy for API if needed. -->
+      <input type="date" class="form-control" name="date" id="date" value="">
+      <div class="form-text">Format: dd-mm-yyyy is also accepted; paste if preferred.</div>
     </div>
     <div class="col-sm-3">
       <label class="form-label">Token <span class="text-muted">(from .env or type)</span></label>
@@ -61,11 +63,42 @@
 <script>
 const baseUrl = "<?= rtrim($baseUrl ?? '', '/') ?>";
 
+// --- Date helpers ---
+function isIsoDate(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s); }
+function isDmyDate(s){ return /^\d{2}-\d{2}-\d{4}$/.test(s); }
+
+// dd-mm-yyyy -> yyyy-mm-dd
 function dmyToIso(dmy) {
-  const m = dmy.match(/^(\\d{2})[-\\/](\\d{2})[-\\/](\\d{4})$/);
-  if (!m) return dmy; // already ISO or empty
+  const m = dmy.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (!m) return dmy;
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
+
+// yyyy-mm-dd -> dd-mm-yyyy
+function isoToDmy(iso) {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+// Normalize any input into what the API expects; your API accepts dd-mm-yyyy fine.
+// If the user used the date picker (ISO), convert to dd-mm-yyyy before calling.
+function normalizeForApi(dateVal) {
+  if (isIsoDate(dateVal)) return isoToDmy(dateVal);
+  return dateVal; // assume already dd-mm-yyyy
+}
+
+// Initialize the date input from the PHP-provided query (?date=dd-mm-yyyy)
+(function initDateFromQuery(){
+  const q = "<?= esc($date ?? '') ?>";
+  const input = document.getElementById('date');
+  if (!q) return;
+  if (isDmyDate(q)) {
+    input.value = dmyToIso(q); // show in the native picker
+  } else if (isIsoDate(q)) {
+    input.value = q;
+  }
+})();
 
 function esc(s){ return (s??'').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -83,13 +116,20 @@ function showDebug(url, status, obj) {
 
 async function loadByDate() {
   const uid = document.getElementById('uid').value.trim();
-  const date = document.getElementById('date').value.trim();
+  let dateVal = document.getElementById('date').value.trim();
   const token = document.getElementById('token').value.trim();
 
-  if (!uid || !date) { alert('Enter UID and Date'); return; }
+  if(!uid || !dateVal) { alert('Enter UID and Date'); return; }
 
-  const iso = dmyToIso(date);
-  const url = `${baseUrl}/api/visit/by-date?token=${encodeURIComponent(token)}&uid=${encodeURIComponent(uid)}&date=${encodeURIComponent(iso)}`;
+  // Allow users to paste dd-mm-yyyy directly into the input (some browsers allow free text)
+  if (!isIsoDate(dateVal) && isDmyDate(dateVal)) {
+    // do nothing, dateVal is dd-mm-yyyy already
+  } else if (isIsoDate(dateVal)) {
+    // convert ISO to dd-mm-yyyy for API
+    dateVal = isoToDmy(dateVal);
+  }
+
+  const url = `${baseUrl}/api/visit/by-date?token=${encodeURIComponent(token)}&uid=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateVal)}`;
 
   document.getElementById('status').textContent = 'Loading visits...';
   showDebug(url, '(fetching...)', '(waiting)');
@@ -105,7 +145,7 @@ async function loadByDate() {
     showDebug(url, status, json);
     document.getElementById('status').textContent = '';
 
-    renderResults(json, uid, iso);
+    renderResults(json, uid, dateVal);
   } catch (e) {
     showDebug(url, status, String(e));
     document.getElementById('status').textContent = 'Load failed';
@@ -137,14 +177,26 @@ async function openToday() {
     try { json = JSON.parse(text); } catch { json = { ok:false, error:'invalid_json', raw: text }; }
 
     showDebug(url, status, json);
-    document.getElementById('status').textContent = json.ok ? 'Open OK' : `Open failed: ${esc(json.error || 'unknown')}`;
+
+    if (json && json.ok && json.visit && json.visit.date) {
+      // API returns dd-mm-yyyy; set picker and reload that date
+      const dmy = json.visit.date; // e.g. 19-08-2025
+      const iso = dmyToIso(dmy);
+      const dateInput = document.getElementById('date');
+      dateInput.value = isIsoDate(iso) ? iso : dateInput.value;
+
+      document.getElementById('status').textContent = 'Open OK → Loading list...';
+      await loadByDate();
+    } else {
+      document.getElementById('status').textContent = `Open finished: ${esc(json && json.error || 'unknown')}`;
+    }
   } catch (e) {
     showDebug(url, status, String(e));
     document.getElementById('status').textContent = 'Open failed (network)';
   }
 }
 
-function renderResults(j, uid, iso) {
+function renderResults(j, uid, dmy) {
   const el = document.getElementById('results');
   if (!j || j.ok === false) {
     el.innerHTML = `<div class="alert alert-danger">Failed: ${esc(j && j.error || 'unknown')}</div>`;
@@ -152,7 +204,8 @@ function renderResults(j, uid, iso) {
   }
   const rows = (j.results || []).map(v => {
     const docs = (v.documents || []).map(d => {
-      const url = `${baseUrl}/admin/visit/file?id=${encodeURIComponent(d.id)}`;
+      // Use the exact URL provided by the API to avoid route mismatches.
+      const url = d.url || `${baseUrl}/admin/visit/file?id=${encodeURIComponent(d.id)}`;
       return `<span class="badge text-bg-secondary doc-badge me-1">${esc(d.type||'-')} <a class="link-light" href="${url}" target="_blank">#${d.id}</a></span>`;
     }).join(' ');
     return `<div class="card mb-2">
@@ -162,21 +215,12 @@ function renderResults(j, uid, iso) {
       </div>
     </div>`;
   }).join('');
-  el.innerHTML = rows || `<div class="alert alert-warning">No visits for ${esc(uid)} on ${esc(iso)}</div>`;
+  el.innerHTML = rows || `<div class="alert alert-warning">No visits for ${esc(uid)} on ${esc(dmy)}</div>`;
 }
 
-// Bind buttons
+// Hook buttons
 document.getElementById('btnLoad').addEventListener('click', loadByDate);
 document.getElementById('btnOpen').addEventListener('click', openToday);
-
-// If query string had uid/date, auto-fill happened in PHP; optionally auto-load
-(function autoLoadIfReady(){
-  const uid = document.getElementById('uid').value.trim();
-  const date = document.getElementById('date').value.trim();
-  if (uid && date) {
-    // do not auto-fire; leave manual to avoid surprise calls
-  }
-})();
 </script>
 </body>
 </html>
