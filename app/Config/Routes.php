@@ -182,10 +182,7 @@ $routes->group('admin', ['filter' => ['devopenaccess']], static function ($route
 });
 
 
-// --- Visual multi-upload tester (dev-open) ---
-$routes->group('admin/tools', ['filter' => 'devopen'], static function($routes) {
-    $routes->get('upload-tester-multi', 'Admin\Tools\UploadTesterMulti::index');
-});
+
 // --- OVERRIDE: Visual multi-upload tester (no filter) ---
 $routes->get('admin/tools/upload-tester-multi', 'Admin\Tools\UploadTesterMulti::index');
 
