@@ -10,10 +10,11 @@
   .doc-badge { font-size: .85rem; }
   .small-mono { font-size:.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   pre.debug { background:#f8f9fa; border:1px solid #e9ecef; padding:.75rem; border-radius:.25rem; max-height:260px; overflow:auto; }
+  .visit-col { min-width: 300px; }
 </style>
 </head>
 <body class="p-3">
-<div class="container" style="max-width: 980px;">
+<div class="container" style="max-width: 1100px;">
   <h3 class="mb-3">Visits Admin View</h3>
 
   <form id="qform" class="row g-3 align-items-end">
@@ -23,9 +24,8 @@
     </div>
     <div class="col-sm-3">
       <label class="form-label">Date</label>
-      <!-- Native date picker (ISO value). We'll convert to dd-mm-yyyy for API if needed. -->
       <input type="date" class="form-control" name="date" id="date" value="">
-      <div class="form-text">Format: dd-mm-yyyy is also accepted; paste if preferred.</div>
+      <div class="form-text">You can also paste dd-mm-yyyy</div>
     </div>
     <div class="col-sm-3">
       <label class="form-label">Token <span class="text-muted">(from .env or type)</span></label>
@@ -37,14 +37,34 @@
     <div class="col-sm-3 d-grid">
       <button type="button" id="btnOpen" class="btn btn-outline-success">Open Today</button>
     </div>
+
+    <div class="col-sm-9">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="chkAll">
+        <label class="form-check-label" for="chkAll">Show all visits for the day (Visit #1 / #2 ...)</label>
+      </div>
+    </div>
   </form>
 
+  <div class="mt-3">
+    <div class="btn-group btn-group-sm" role="group" aria-label="Type filters">
+      <button type="button" class="btn btn-outline-secondary type-filter active" data-type="">All</button>
+      <button type="button" class="btn btn-outline-secondary type-filter" data-type="rx">rx</button>
+      <button type="button" class="btn btn-outline-secondary type-filter" data-type="photo">photo</button>
+      <button type="button" class="btn btn-outline-secondary type-filter" data-type="doc">doc</button>
+      <button type="button" class="btn btn-outline-secondary type-filter" data-type="xray">xray</button>
+      <button type="button" class="btn btn-outline-secondary type-filter" data-type="lab">lab</button>
+      <button type="button" class="btn btn-outline-secondary type-filter" data-type="usg">usg</button>
+      <button type="button" class="btn btn-outline-secondary type-filter" data-type="invoice">invoice</button>
+    </div>
+  </div>
+
   <div class="row mt-3">
-    <div class="col-md-7">
+    <div class="col-lg-7">
       <div id="status" class="mb-2 text-muted small-mono"></div>
       <div id="results"></div>
     </div>
-    <div class="col-md-5">
+    <div class="col-lg-5">
       <div class="card">
         <div class="card-header py-2"><strong>Request Debug</strong></div>
         <div class="card-body">
@@ -63,74 +83,63 @@
 <script>
 const baseUrl = "<?= rtrim($baseUrl ?? '', '/') ?>";
 
-// --- Date helpers ---
 function isIsoDate(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s); }
 function isDmyDate(s){ return /^\d{2}-\d{2}-\d{4}$/.test(s); }
-
-// dd-mm-yyyy -> yyyy-mm-dd
 function dmyToIso(dmy) {
   const m = dmy.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
   if (!m) return dmy;
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
-
-// yyyy-mm-dd -> dd-mm-yyyy
 function isoToDmy(iso) {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return iso;
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
-
-// Normalize any input into what the API expects; your API accepts dd-mm-yyyy fine.
-// If the user used the date picker (ISO), convert to dd-mm-yyyy before calling.
-function normalizeForApi(dateVal) {
-  if (isIsoDate(dateVal)) return isoToDmy(dateVal);
-  return dateVal; // assume already dd-mm-yyyy
-}
-
-// Initialize the date input from the PHP-provided query (?date=dd-mm-yyyy)
 (function initDateFromQuery(){
   const q = "<?= esc($date ?? '') ?>";
   const input = document.getElementById('date');
   if (!q) return;
-  if (isDmyDate(q)) {
-    input.value = dmyToIso(q); // show in the native picker
-  } else if (isIsoDate(q)) {
-    input.value = q;
-  }
+  if (isDmyDate(q))      input.value = dmyToIso(q);
+  else if (isIsoDate(q)) input.value = q;
 })();
 
 function esc(s){ return (s??'').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-
 function showDebug(url, status, obj) {
   document.getElementById('dbgUrl').textContent = url || '(none)';
   document.getElementById('dbgStatus').textContent = (status !== undefined) ? String(status) : '(none)';
-  try {
-    document.getElementById('dbgJson').textContent = (obj !== undefined)
-      ? JSON.stringify(obj, null, 2)
-      : '(none)';
-  } catch(e) {
-    document.getElementById('dbgJson').textContent = String(obj);
-  }
+  try { document.getElementById('dbgJson').textContent = (obj !== undefined) ? JSON.stringify(obj, null, 2) : '(none)'; }
+  catch(e) { document.getElementById('dbgJson').textContent = String(obj); }
 }
+
+let currentTypeFilter = '';
+document.querySelectorAll('.type-filter').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.type-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTypeFilter = btn.dataset.type || '';
+    // re-render using cached last JSON (if any)
+    const raw = document.getElementById('dbgJson').textContent;
+    try {
+      const j = JSON.parse(raw);
+      const uid = document.getElementById('uid').value.trim();
+      let d = document.getElementById('date').value.trim();
+      d = isIsoDate(d) ? isoToDmy(d) : d;
+      renderResults(j, uid, d);
+    } catch {}
+  });
+});
 
 async function loadByDate() {
   const uid = document.getElementById('uid').value.trim();
   let dateVal = document.getElementById('date').value.trim();
   const token = document.getElementById('token').value.trim();
+  const all = document.getElementById('chkAll').checked ? 1 : 0;
 
   if(!uid || !dateVal) { alert('Enter UID and Date'); return; }
 
-  // Allow users to paste dd-mm-yyyy directly into the input (some browsers allow free text)
-  if (!isIsoDate(dateVal) && isDmyDate(dateVal)) {
-    // do nothing, dateVal is dd-mm-yyyy already
-  } else if (isIsoDate(dateVal)) {
-    // convert ISO to dd-mm-yyyy for API
-    dateVal = isoToDmy(dateVal);
-  }
+  if (isIsoDate(dateVal)) dateVal = isoToDmy(dateVal);
 
-  const url = `${baseUrl}/api/visit/by-date?token=${encodeURIComponent(token)}&uid=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateVal)}`;
-
+  const url = `${baseUrl}/api/visit/by-date?token=${encodeURIComponent(token)}&uid=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateVal)}&all=${all}`;
   document.getElementById('status').textContent = 'Loading visits...';
   showDebug(url, '(fetching...)', '(waiting)');
 
@@ -144,7 +153,6 @@ async function loadByDate() {
 
     showDebug(url, status, json);
     document.getElementById('status').textContent = '';
-
     renderResults(json, uid, dateVal);
   } catch (e) {
     showDebug(url, status, String(e));
@@ -175,16 +183,13 @@ async function openToday() {
     text = await resp.text();
     let json;
     try { json = JSON.parse(text); } catch { json = { ok:false, error:'invalid_json', raw: text }; }
-
     showDebug(url, status, json);
 
     if (json && json.ok && json.visit && json.visit.date) {
-      // API returns dd-mm-yyyy; set picker and reload that date
-      const dmy = json.visit.date; // e.g. 19-08-2025
+      const dmy = json.visit.date;
       const iso = dmyToIso(dmy);
       const dateInput = document.getElementById('date');
       dateInput.value = isIsoDate(iso) ? iso : dateInput.value;
-
       document.getElementById('status').textContent = 'Open OK → Loading list...';
       await loadByDate();
     } else {
@@ -202,23 +207,44 @@ function renderResults(j, uid, dmy) {
     el.innerHTML = `<div class="alert alert-danger">Failed: ${esc(j && j.error || 'unknown')}</div>`;
     return;
   }
-  const rows = (j.results || []).map(v => {
-    const docs = (v.documents || []).map(d => {
-      // Use the exact URL provided by the API to avoid route mismatches.
+
+  const results = Array.isArray(j.results) ? j.results : [];
+  if (results.length === 0) {
+    el.innerHTML = `<div class="alert alert-warning">No visits for ${esc(uid)} on ${esc(dmy)}</div>`;
+    return;
+  }
+
+  if (document.getElementById('chkAll').checked && results.length > 1) {
+    // side-by-side columns
+    const cols = results.map(v => visitCard(v)).join('');
+    el.innerHTML = `<div class="row g-3">${cols}</div>`;
+  } else {
+    // single list
+    el.innerHTML = results.map(v => visitCard(v)).join('');
+  }
+
+  function visitCard(v) {
+    const docs = (v.documents || []).filter(d => {
+      if (!currentTypeFilter) return true;
+      return (d.type || '').toLowerCase() === currentTypeFilter;
+    }).map(d => {
       const url = d.url || `${baseUrl}/admin/visit/file?id=${encodeURIComponent(d.id)}`;
-      return `<span class="badge text-bg-secondary doc-badge me-1">${esc(d.type||'-')} <a class="link-light" href="${url}" target="_blank">#${d.id}</a></span>`;
+      const type = (d.type || '-').toLowerCase();
+      return `<span class="badge text-bg-secondary doc-badge me-1">${esc(type)} <a class="link-light" href="${url}" target="_blank">#${d.id}</a></span>`;
     }).join(' ');
-    return `<div class="card mb-2">
-      <div class="card-body">
-        <div class="kv"><b>Visit</b> ${esc(v.id)} — ${esc(v.date)} seq ${esc(v.sequence)}</div>
-        <div class="mt-2">${docs || '<span class="text-muted">No documents</span>'}</div>
+
+    return `<div class="col visit-col">
+      <div class="card mb-2 h-100">
+        <div class="card-body">
+          <div class="kv"><b>Visit</b> ${esc(v.id)} — ${esc(v.date)} seq ${esc(v.sequence)}</div>
+          <div class="mt-2">${docs || '<span class="text-muted">No documents</span>'}</div>
+        </div>
       </div>
     </div>`;
-  }).join('');
-  el.innerHTML = rows || `<div class="alert alert-warning">No visits for ${esc(uid)} on ${esc(dmy)}</div>`;
+  }
 }
 
-// Hook buttons
+// Bind
 document.getElementById('btnLoad').addEventListener('click', loadByDate);
 document.getElementById('btnOpen').addEventListener('click', openToday);
 </script>

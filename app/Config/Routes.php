@@ -174,3 +174,10 @@ $routes->group('admin', ['filter' => ['devopenaccess']], static function ($route
 // Optional public alias (kept since it appears in your links page)
 
 $routes->get('admin/visit/file', 'Admin\VisitViewController::file', ['filter' => 'devopenaccess']);
+
+// === ADD-ONLY: Tools Today + ensure Visits Admin View present ===
+$routes->group('admin', ['filter' => ['devopenaccess']], static function ($routes) {
+    $routes->get('tools/today', 'Admin\Tools\Today::index');
+    $routes->get('tools/visits-admin-view', 'Admin\Tools\VisitsAdminView::index'); // keep canonical
+});
+
