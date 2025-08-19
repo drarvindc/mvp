@@ -201,3 +201,9 @@ $routes->post('api/visit/open',   'Api\VisitController::open');     // POST uid=
 
 // Optional: a tiny UI page for Settings (since JSON works but Tools view may not show the block)
 $routes->get('admin/tools/settings-ui', 'Admin\Tools\Settings::index');
+
+// API endpoints used by Visits-Lite and Admin visits view
+$routes->get('api/visit/by-date', 'Api\VisitController::byDate'); // GET ?uid=...&today=1|date=dd-mm-yyyy&all=1
+$routes->post('api/visit/open',   'Api\VisitController::open');   // POST uid=...
+// (Optional) keep existing testers that hit Api\VisitController::upload working via proxy:
+$routes->post('api/visit/upload', 'Api\VisitController::upload');
