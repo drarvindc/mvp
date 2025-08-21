@@ -1,3 +1,0 @@
-// Map /admin/tools to a small menu
-// Inside your existing admin group:
-$routes->get('tools', 'Admin\Tools\Home::index'); // replaces the redirect if you had one

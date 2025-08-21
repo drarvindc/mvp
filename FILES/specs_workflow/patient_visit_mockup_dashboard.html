@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pet Dashboard — Mockup</title>
+<style>
+  :root{
+    --bg:#ffffff; --ink:#0f172a; --muted:#6b7280; --em:#2563eb; --bd:#e5e7eb;
+    --chip:#f1f5f9; --ok:#16a34a; --warn:#f59e0b; --danger:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14.5px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+  .wrap{max-width:1280px;margin:0 auto;padding:16px}
+  h1,h2,h3{margin:0 0 10px}
+  .muted{color:var(--muted)}
+  .card{border:1px solid var(--bd);border-radius:12px;background:#fff;padding:14px}
+  .row{display:flex;gap:16px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;background:var(--em);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+  .btn.ghost{background:#f3f4f6;color:#111;border:1px solid var(--bd)}
+  .btn.secondary{background:#475569}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border:1px solid var(--bd);color:#111;border-radius:999px;padding:6px 10px;margin-right:8px}
+  .pill{display:inline-block;padding:6px 10px;border:1px solid var(--bd);border-radius:999px;margin:6px 8px 0 0;background:#f8fafc;color:#111;cursor:pointer;text-decoration:none}
+  .pill.active{background:var(--em);border-color:var(--em);color:#fff}
+  .grid2{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center}
+  .kv{display:grid;grid-template-columns:140px 1fr;gap:8px}
+  input,select{padding:8px;border:1px solid var(--bd);border-radius:10px;font-size:14.5px;width:100%}
+  .header-card .kv{grid-template-columns:120px 1fr}
+  .tabbar{display:flex;gap:8px;border-bottom:1px solid var(--bd);margin-top:6px}
+  .tab{padding:10px 12px;border:1px solid var(--bd);border-bottom:0;border-radius:10px 10px 0 0;background:#f8fafc;cursor:pointer}
+  .tab.active{background:#fff;border-bottom:1px solid #fff}
+  .tabpanel{border:1px solid var(--bd);border-top:0;border-radius:0 0 12px 12px;padding:14px;margin-bottom:16px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left;font-size:14px}
+  .thumbs{display:flex;flex-wrap:wrap;gap:10px}
+  .thumb{border:1px solid var(--bd);border-radius:10px;padding:6px;width:160px}
+  .thumb img{display:block;max-width:100%;border-radius:8px}
+  .section-title{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .badge{padding:3px 8px;border-radius:999px;border:1px solid var(--bd);background:#f8fafc;font-size:12px}
+  .badge.ok{border-color:#bbf7d0;background:#ecfdf5;color:#166534}
+  .badge.warn{border-color:#fde68a;background:#fffbeb;color:#78350f}
+  .qr{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b1420;color:#d1e7ff;padding:8px 10px;border-radius:8px}
+  .debug{white-space:pre-wrap;background:#0b1420;color:#d1e7ff;padding:10px;border-radius:10px;max-height:260px;overflow:auto}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px}
+  .filterbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .filterbar .pill{margin-top:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="row">
+    <div class="card header-card" style="flex:2 1 640px">
+      <div class="section-title">
+        <h1>Pet Dashboard</h1>
+        <div>
+          <span class="chip">Visit <strong>#1023</strong></span>
+          <span class="chip">Date <strong>11‑08‑2025</strong></span>
+          <span class="chip">Status <strong>Open</strong></span>
+          <span class="chip badge ok">Balance ₹0.00</span>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <div class="card" style="flex:1 1 360px">
+          <div class="kv">
+            <div><strong>Pet</strong></div><div>Tommy • Labrador • ♂ • 5y 2m</div>
+            <div><strong>UID</strong></div><div><span class="qr">250001</span></div>
+            <div><strong>Owner</strong></div><div>Arvind Chauhan</div>
+            <div><strong>Mobile</strong></div><div>+91 98xxx xxxxx</div>
+          </div>
+        </div>
+        <div class="card" style="flex:1 1 360px">
+          <div class="grid2">
+            <label>UID</label><input value="250001" />
+            <label>Date</label><input value="11-08-2025" />
+          </div>
+          <div class="toolbar" style="margin-top:8px">
+            <button class="btn" onclick="toast('Open Today')">Open Today</button>
+            <button class="btn secondary" onclick="toast('New Visit')">New Visit</button>
+            <button class="btn ghost" onclick="toast('Reprint Letterhead')">Reprint</button>
+            <button class="btn ghost" onclick="toast('Edit Pet/Owner')">Edit</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1 1 300px">
+      <h3 style="margin-bottom:6px">Today’s Visits</h3>
+      <div id="todayPills">
+        <a href="#" class="pill active" onclick="switchVisit(1);return false;">Visit #1 (3)</a>
+        <a href="#" class="pill" onclick="switchVisit(2);return false;">Visit #2 (1)</a>
+      </div>
+      <div class="muted" style="margin-top:8px">Click to switch the selected visit for attachments below.</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabbar" role="tablist">
+    <div class="tab active" data-tab="today">Today’s Visit</div>
+    <div class="tab" data-tab="preventive">Preventive Care</div>
+    <div class="tab" data-tab="documents">Documents</div>
+    <div class="tab" data-tab="billing">Billing</div>
+    <div class="tab" data-tab="timeline">Timeline</div>
+  </div>
+
+  <!-- PANEL: TODAY -->
+  <div class="tabpanel" id="panel-today">
+    <div class="row">
+      <div class="card" style="flex:1 1 420px">
+        <h3>Visit Summary</h3>
+        <div class="kv" style="margin-top:6px">
+          <div><strong>Reason</strong></div><div>Follow‑up</div>
+          <div><strong>Notes</strong></div>
+          <div><textarea style="width:100%;height:74px;border:1px solid var(--bd);border-radius:10px;padding:8px" placeholder="Quick note…"></textarea></div>
+          <div><strong>Next Visit</strong></div>
+          <div><input placeholder="dd-mm-yyyy" value="25-08-2025" /></div>
+        </div>
+        <div class="toolbar" style="margin-top:10px">
+          <button class="btn" onclick="toast('Save Summary')">Save</button>
+          <button class="btn ghost" onclick="toast('Add Certificate')">Certificate</button>
+        </div>
+      </div>
+
+      <div class="card" style="flex:2 1 640px">
+        <div class="section-title">
+          <h3>Attachments</h3>
+          <div class="filterbar">
+            <span class="pill active" onclick="filterType('all')">All</span>
+            <span class="pill" onclick="filterType('prescription')">Prescription</span>
+            <span class="pill" onclick="filterType('lab')">Lab</span>
+            <span class="pill" onclick="filterType('xray')">X‑ray</span>
+            <span class="pill" onclick="filterType('doc')">Doc</span>
+            <span class="pill" onclick="filterType('photo')">Photo</span>
+            <span class="pill" onclick="filterType('invoice')">Invoice</span>
+          </div>
+        </div>
+        <div class="toolbar" style="margin-bottom:8px">
+          <button class="btn" onclick="toast('Upload (PC)')">Upload (PC)</button>
+          <button class="btn ghost" onclick="toast('Android Scan')">Android Scan</button>
+          <button class="btn ghost" onclick="toast('Download All')">Download All</button>
+        </div>
+        <div class="thumbs" id="thumbs">
+          <div class="thumb" data-type="prescription"><img src="https://picsum.photos/seed/rx1/400/240" alt=""><div class="muted">110825-rx-250001-02.png</div></div>
+          <div class="thumb" data-type="photo"><img src="https://picsum.photos/seed/p1/400/240" alt=""><div class="muted">110825-photo-250001-03.jpg</div></div>
+          <div class="thumb" data-type="photo"><img src="https://picsum.photos/seed/p2/400/240" alt=""><div class="muted">110825-photo-250001-04.jpg</div></div>
+          <div class="thumb" data-type="doc"><img src="https://picsum.photos/seed/doc1/400/240" alt=""><div class="muted">110825-doc-250001-01.pdf</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL: PREVENTIVE -->
+  <div class="tabpanel" id="panel-preventive" hidden>
+    <div class="row">
+      <div class="card" style="flex:1 1 360px">
+        <h3>Vaccination</h3>
+        <div class="kv" style="margin-top:6px">
+          <div><strong>Last</strong></div><div>10‑04‑2025 (DHPPi)</div>
+          <div><strong>Next due</strong></div><div>10‑04‑2026 <span class="badge warn">6m away</span></div>
+        </div>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn" onclick="toast('Record Vaccine')">Record Event</button>
+          <button class="btn ghost" onclick="toast('View Schedule')">View Schedule</button>
+        </div>
+      </div>
+      <div class="card" style="flex:1 1 360px">
+        <h3>Deworming</h3>
+        <div class="kv" style="margin-top:6px">
+          <div><strong>Last</strong></div><div>11‑07‑2025</div>
+          <div><strong>Next due</strong></div><div>11‑09‑2025</div>
+        </div>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn" onclick="toast('Record Deworming')">Record Event</button>
+          <button class="btn ghost" onclick="toast('View Schedule')">View Schedule</button>
+        </div>
+      </div>
+      <div class="card" style="flex:1 1 360px">
+        <h3>Tick/Flea</h3>
+        <div class="kv" style="margin-top:6px">
+          <div><strong>Last</strong></div><div>19‑08‑2025 (Bravecto)</div>
+          <div><strong>Next due</strong></div><div>19‑11‑2025</div>
+        </div>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn" onclick="toast('Record Tick/Flea')">Record Event</button>
+          <button class="btn ghost" onclick="toast('View Schedule')">View Schedule</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL: DOCUMENTS -->
+  <div class="tabpanel" id="panel-documents" hidden>
+    <div class="section-title">
+      <h3>All Documents</h3>
+      <div class="toolbar">
+        <input placeholder="Search filename/type…" style="width:260px" />
+        <select>
+          <option>All Types</option><option>Prescription</option><option>Photo</option>
+          <option>Doc</option><option>Lab</option><option>X‑ray</option><option>Invoice</option>
+        </select>
+      </div>
+    </div>
+    <table style="margin-top:8px">
+      <thead><tr><th>Date/Time</th><th>Visit</th><th>Type</th><th>Filename</th><th>Size</th><th>Source</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr><td>11‑08‑2025 10:18</td><td>#1</td><td>Prescription</td><td>110825‑rx‑250001‑02.png</td><td>220 KB</td><td>Android</td><td><a href="#">Open</a> · <a href="#">Move</a></td></tr>
+        <tr><td>11‑08‑2025 19:48</td><td>#2</td><td>Photo</td><td>110825‑photo‑250001‑03.jpg</td><td>1.1 MB</td><td>Web</td><td><a href="#">Open</a> · <a href="#">Move</a></td></tr>
+        <tr><td>10‑08‑2025 09:12</td><td>#1</td><td>Doc</td><td>100825‑doc‑250001‑01.pdf</td><td>340 KB</td><td>Ingest</td><td><a href="#">Open</a> · <a href="#">Move</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PANEL: BILLING -->
+  <div class="tabpanel" id="panel-billing" hidden>
+    <div class="row">
+      <div class="card" style="flex:1 1 360px">
+        <h3>Today’s Invoices</h3>
+        <div class="chip">INV‑2025‑0811‑001 • ₹1,420.00</div>
+        <div class="chip">INV‑2025‑0811‑002 • ₹650.00</div>
+        <div class="muted" style="margin-top:8px">Click an invoice in real view to open details.</div>
+      </div>
+      <div class="card" style="flex:2 1 560px">
+        <h3>Last Invoice Details</h3>
+        <table style="margin-top:6px">
+          <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+          <tbody>
+            <tr><td>Consultation</td><td>1</td><td>₹400</td><td>₹400</td></tr>
+            <tr><td>Vaccine — DHPPi</td><td>1</td><td>₹780</td><td>₹780</td></tr>
+            <tr><td>Injection</td><td>2</td><td>₹120</td><td>₹240</td></tr>
+            <tr><td><strong>Total</strong></td><td></td><td></td><td><strong>₹1,420</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL: TIMELINE -->
+  <div class="tabpanel" id="panel-timeline" hidden>
+    <h3>Timeline</h3>
+    <div class="chip">11‑08‑2025 • Visit #2 • Note added</div>
+    <div class="chip">11‑08‑2025 • 2 photos uploaded</div>
+    <div class="chip">10‑08‑2025 • Visit #1 • Prescription uploaded</div>
+  </div>
+
+  <!-- DEBUG (mock data echo) -->
+  <div class="card" style="margin-top:16px">
+    <h3>Debug</h3>
+    <div class="debug" id="debug">[UI‑only mockup; no live data]</div>
+  </div>
+
+</div>
+
+<script>
+  // Tabs
+  const tabs=[...document.querySelectorAll('.tab')];
+  const panels={
+    today:document.getElementById('panel-today'),
+    preventive:document.getElementById('panel-preventive'),
+    documents:document.getElementById('panel-documents'),
+    billing:document.getElementById('panel-billing'),
+    timeline:document.getElementById('panel-timeline'),
+  };
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    Object.values(panels).forEach(p=>p.hidden=true);
+    panels[t.dataset.tab].hidden=false;
+  }));
+
+  // Visit switch mock
+  function switchVisit(n){
+    document.getElementById('debug').textContent='Switched to Visit #'+n+' (mock)';
+    [...document.querySelectorAll('#todayPills .pill')].forEach((el,i)=>el.classList.toggle('active', (i===n-1)));
+  }
+
+  // Attachments filter mock
+  function filterType(type){
+    const items=[...document.querySelectorAll('.thumb')];
+    items.forEach(it=>{
+      it.style.display = (type==='all' || it.dataset.type===type) ? '' : 'none';
+    });
+    document.getElementById('debug').textContent='Filter: '+type+' (mock)';
+  }
+
+  function toast(msg){
+    document.getElementById('debug').textContent=msg+' (mock)';
+  }
+</script>
+</body>
+</html>
